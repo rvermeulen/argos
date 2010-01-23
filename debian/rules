@@ -1,0 +1,80 @@
+#!/usr/bin/make -f
+#
+# $Id: rules 239 2007-05-16 03:54:01Z guillem $
+#
+
+DEB_HOST_ARCH_OS = $(shell dpkg-architecture -qDEB_HOST_ARCH_OS)
+
+CC = gcc-3.4
+# WARNING: Removing no-strict-aliasing will make qemu insta-segfault.
+CFLAGS = -Wall -fno-strict-aliasing
+
+ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
+	CFLAGS += -O0
+else
+	CFLAGS += -O2
+endif
+
+ifeq ($(DEB_HOST_ARCH_OS),linux)
+	conf_arch += --enable-alsa 
+endif
+
+D = $(CURDIR)/debian/argos
+
+config-host.mak: configure
+	dh_testdir
+	
+	CFLAGS="$(CFLAGS)" ./configure \
+	  --prefix=/usr \
+	  $(conf_arch) \
+	  --cc=$(CC)
+
+build: config-host.mak
+	dh_testdir
+	
+	$(MAKE)
+
+clean: 
+	dh_testdir
+	dh_testroot
+	
+	-$(MAKE) distclean
+	
+	dh_clean
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_clean -k
+	dh_installdirs -a
+	
+	$(MAKE) DESTDIR=$(D) install
+	
+binary-indep:
+# Nothing to do.
+
+binary-arch: install
+	dh_testdir
+	dh_testroot
+	dh_install -a
+	dh_installdebconf -a
+	dh_installdocs -a
+	dh_installexamples -a
+	dh_installlogrotate -a
+	dh_installman -a
+	dh_installinfo -a
+	dh_installchangelogs -a Changelog
+	dh_link -a
+	dh_strip -a
+	dh_compress -a
+	dh_fixperms -a
+	dh_installdeb -a
+	dh_shlibdeps -a
+	dh_gencontrol -a
+	dh_md5sums -a
+	dh_builddeb -a
+
+binary: binary-indep binary-arch
+
+.PHONY: build clean binary-indep binary-arch binary install
+

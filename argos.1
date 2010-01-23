@@ -1,0 +1,276 @@
+.\" Based on qemu.1
+.\"
+.\" Standard preamble:
+.\" ========================================================================
+.de Sh \" Subsection heading
+.br
+.if t .Sp
+.ne 5
+.PP
+\fB\\$1\fR
+.PP
+..
+.de Sp \" Vertical space (when we can't use .PP)
+.if t .sp .5v
+.if n .sp
+..
+.de Vb \" Begin verbatim text
+.ft CW
+.nf
+.ne \\$1
+..
+.de Ve \" End verbatim text
+.ft R
+.fi
+..
+.\" Set up some character translations and predefined strings.  \*(-- will
+.\" give an unbreakable dash, \*(PI will give pi, \*(L" will give a left
+.\" double quote, and \*(R" will give a right double quote.  | will give a
+.\" real vertical bar.  \*(C+ will give a nicer C++.  Capital omega is used to
+.\" do unbreakable dashes and therefore won't be available.  \*(C` and \*(C'
+.\" expand to `' in nroff, nothing in troff, for use with C<>.
+.tr \(*W-|\(bv\*(Tr
+.ds C+ C\v'-.1v'\h'-1p'\s-2+\h'-1p'+\s0\v'.1v'\h'-1p'
+.ie n \{\
+.    ds -- \(*W-
+.    ds PI pi
+.    if (\n(.H=4u)&(1m=24u) .ds -- \(*W\h'-12u'\(*W\h'-12u'-\" diablo 10 pitch
+.    if (\n(.H=4u)&(1m=20u) .ds -- \(*W\h'-12u'\(*W\h'-8u'-\"  diablo 12 pitch
+.    ds L" ""
+.    ds R" ""
+.    ds C` ""
+.    ds C' ""
+'br\}
+.el\{\
+.    ds -- \|\(em\|
+.    ds PI \(*p
+.    ds L" ``
+.    ds R" ''
+'br\}
+.\"
+.\" If the F register is turned on, we'll generate index entries on stderr for
+.\" titles (.TH), headers (.SH), subsections (.Sh), items (.Ip), and index
+.\" entries marked with X<> in POD.  Of course, you'll have to process the
+.\" output yourself in some meaningful fashion.
+.if \nF \{\
+.    de IX
+.    tm Index:\\$1\t\\n%\t"\\$2"
+..
+.    nr % 0
+.    rr F
+.\}
+.\"
+.\" For nroff, turn off justification.  Always turn off hyphenation; it makes
+.\" way too many mistakes in technical documents.
+.hy 0
+.if n .na
+.\"
+.\" Accent mark definitions (@(#)ms.acc 1.5 88/02/08 SMI; from UCB 4.2).
+.\" Fear.  Run.  Save yourself.  No user-serviceable parts.
+.    \" fudge factors for nroff and troff
+.if n \{\
+.    ds #H 0
+.    ds #V .8m
+.    ds #F .3m
+.    ds #[ \f1
+.    ds #] \fP
+.\}
+.if t \{\
+.    ds #H ((1u-(\\\\n(.fu%2u))*.13m)
+.    ds #V .6m
+.    ds #F 0
+.    ds #[ \&
+.    ds #] \&
+.\}
+.    \" simple accents for nroff and troff
+.if n \{\
+.    ds ' \&
+.    ds ` \&
+.    ds ^ \&
+.    ds , \&
+.    ds ~ ~
+.    ds /
+.\}
+.if t \{\
+.    ds ' \\k:\h'-(\\n(.wu*8/10-\*(#H)'\'\h"|\\n:u"
+.    ds ` \\k:\h'-(\\n(.wu*8/10-\*(#H)'\`\h'|\\n:u'
+.    ds ^ \\k:\h'-(\\n(.wu*10/11-\*(#H)'^\h'|\\n:u'
+.    ds , \\k:\h'-(\\n(.wu*8/10)',\h'|\\n:u'
+.    ds ~ \\k:\h'-(\\n(.wu-\*(#H-.1m)'~\h'|\\n:u'
+.    ds / \\k:\h'-(\\n(.wu*8/10-\*(#H)'\z\(sl\h'|\\n:u'
+.\}
+.    \" troff and (daisy-wheel) nroff accents
+.ds : \\k:\h'-(\\n(.wu*8/10-\*(#H+.1m+\*(#F)'\v'-\*(#V'\z.\h'.2m+\*(#F'.\h'|\\n:u'\v'\*(#V'
+.ds 8 \h'\*(#H'\(*b\h'-\*(#H'
+.ds o \\k:\h'-(\\n(.wu+\w'\(de'u-\*(#H)/2u'\v'-.3n'\*(#[\z\(de\v'.3n'\h'|\\n:u'\*(#]
+.ds d- \h'\*(#H'\(pd\h'-\w'~'u'\v'-.25m'\f2\(hy\fP\v'.25m'\h'-\*(#H'
+.ds D- D\\k:\h'-\w'D'u'\v'-.11m'\z\(hy\v'.11m'\h'|\\n:u'
+.ds th \*(#[\v'.3m'\s+1I\s-1\v'-.3m'\h'-(\w'I'u*2/3)'\s-1o\s+1\*(#]
+.ds Th \*(#[\s+2I\s-2\h'-\w'I'u*3/5'\v'-.3m'o\v'.3m'\*(#]
+.ds ae a\h'-(\w'a'u*4/10)'e
+.ds Ae A\h'-(\w'A'u*4/10)'E
+.    \" corrections for vroff
+.if v .ds ~ \\k:\h'-(\\n(.wu*9/10-\*(#H)'\s-2\u~\d\s+2\h'|\\n:u'
+.if v .ds ^ \\k:\h'-(\\n(.wu*10/11-\*(#H)'\v'-.4m'^\v'.4m'\h'|\\n:u'
+.    \" for low resolution devices (crt and lpr)
+.if \n(.H>23 .if \n(.V>19 \
+\{\
+.    ds : e
+.    ds 8 ss
+.    ds o a
+.    ds d- d\h'-1'\(ga
+.    ds D- D\h'-1'\(hy
+.    ds th \o'bp'
+.    ds Th \o'LP'
+.    ds ae ae
+.    ds Ae AE
+.\}
+.rm #[ #] #H #V #F C
+.\" ========================================================================
+.\"
+.IX Title "ARGOS 1"
+.TH ARGOS 1 "2008-02-27" " " " "
+.SH "NAME"
+argos\-doc \- ARGOS Secure Qemu based CPU Emulator User Documentation
+.SH "SYNOPSIS"
+.IX Header "SYNOPSIS"
+usage: argos [options] [\fIdisk_image\fR]
+.SH "OPTIONS"
+.IX Header "OPTIONS"
+\&\fIdisk_image\fR is a raw hard disk image for \s-1IDE\s0 hard disk 0.
+.PP
+Argos options:
+.IP "\fB\-net nic[,vlan=\fR\fIn\fR\fB][,macaddr=\fR\fIaddr\fR\fB][,model=\fR\fItype\fR\fB]\fR" 4
+.IX Item "-net nic[,vlan=n][,macaddr=addr][,model=type]"
+Same as in QEMU. 
+All the models supported by Qemu are also supported by Argos, but the ne2k_pci
+alone is tracked for security purposes.
+.IP "\fB\-net tap[,vlan=\fR\fIn\fR\fB][,fd=\fR\fIh\fR\fB][,ifname=\fR\fIname\fR\fB][,script=\fR\fIfile\fR\fB]\fR" 4
+.IX Item "-net tap[,vlan=n][,fd=h][,ifname=name][,script=file]"
+Same as in QEMU.
+The default network scripts are \fI/etc/argos\-ifup\fR and 
+\fI/etc/argos\-ifdown\fR.
+.IP "\fB\-linux\fR" 4
+.IX Item "-linux"
+Use it when running Linux as a guest OS. It is necessary for proper logging
+after detecting an alert, as well as for injecting forensics shellcode.
+.IP "\fB\-win2k\fR" 4
+.IX Item "-win2k"
+Use it when running Windows 2000 as a guest OS. It is necessary for proper 
+logging after detecting an alert, as well as for injecting forensics shellcode.
+.IP "\fB\-winxp\fR" 4
+.IX Item "-winxp"
+Use it when running Windows XP as a guest OS. It is necessary for proper 
+logging after detecting an alert, as well as for injecting forensics shellcode.
+.IP "\fB\-no\-csilog\fR" 4
+.IX Item "-no-csilog"
+Skip the generation of a log after detecting an alert.
+.\" .IP "\fB\-sctrack\fR" 4
+.\" .IX Item "-sctrack"
+.\" Track the shellcode's control flow after the detection of an attack.
+.\" A new file named 'argos_sctrack.log' is created that contains all the flow
+.\" decisions of the shellcode. The logged decisions are determined the same way an
+.\" attack is determined, by looking at tainted operands of jmp, call, or ret
+.\" instructions, as well as tainted jump targets.  The log starts with a copy of
+.\" the alert line generated by Argos and the control flow decisions follow using
+.\" the format below:
+.\" 
+.\" <current EIP in hex>: <alert code, JMP, CI, etc> <target EIP in hex>
+.\" 
+.\" The tracing only works for the first detected attack, and does not offer a lot
+.\" of details. Also note that you need to supply option `-no-fsc' to disable the
+.\" injection of the forensics shellcode, and to allow the control flow diversion.
+.IP "\fB\-no\-fsc\fR" 4
+.IX Item "-no-fsc"
+Skip the injection of forensics shellcode after detecting an alert. Forensics
+shellcode is injected within the exploited application, and the instruction
+pointer (EIP) is set to execute it. The shellcode is assembly code that
+retrieves the process id (PID) of the exploited process, and transmits it to the
+guest OS using TCP, at port 15000.
+If you supply this option, the control flow diversion that generated the alert
+will be allowed.
+.IP "\fB\-csaddr listening_address\fR" 4
+.IX Item "-csaddr" listening_address
+Enable control socket, and start listening at \fIlistening_address\fR.
+Argos supplies a socket that can be -optionally- enabled to control the
+virtual machine remotely. The socket can be used for both input and output.
+IT does not provide any authentication or
+secure data transmission.
+
+Output: When one connects to the control socket, the current working directory of the
+Argos process is transmitted, as a string terminated by a new line.
+During the operation of Argos, when a control socket has been enabled all
+alerts are redirected to the control socket. An alert can generate to type of
+messages:
+.Sp
+[ARGOS] Attack detected, code <\fI3_letter_alert_description\fR>
+.Sp
+[ARGOS] Log generated <argos.csi.\fIrandom_id\fR>
+.Sp
+All messages are followed by a new line.
+
+Input: Various commands can be issued over the control socket. Commands consist of a
+string followed by a new line. Supported commands are:
+.Sp
+RESET The virtual machine is reset (rebooted
+.Sp
+SHUTDOWN The virtual machine is shut down (power off)
+.Sp
+PAUSE The virtual machine is paused
+.Sp
+RESUME The virtual machine is resumed
+.IP "\fB\-csport listening_port\fR" 4
+.IX Item "-csport" listening_port
+Change control socket listening port to \fIlistening_port\fR. Default port is
+1374.
+.IP "\fB\-wp profile\fR" 4
+.IX Item "-wp" profile
+Set the whitelist profile to be used to \fIprofile\fR.
+.SH "FILES"
+.IX Header "FILES"
+.IP "\fB/etc/argos-ifup\fR" 4
+.IX Item "/etc/argos-ifup"
+Contains the commands to bring the interface up.
+.IP "\fB/etc/argos-ifdown\fR" 4
+.IX Item "/etc/argos-ifdown"
+Contains the commands to bring the interface down.
+.IP "\fB/etc/argos-whitelist\fR" 4
+.IX Item "/etc/argos-whitelist"
+The whitelist contains a set of virtual address that will not be checked for
+a certain attacks. This can be used to avoid false positives on certain well
+known problematic kernels. The whitelist can contain addresses for different
+guest OS profiles e.g. linux, win2k, winxp and etc.
+.Sp
+Argos will pick up the entries for the running guest system based on the
+command line switches such as -linux (default if no switch is
+speciifed), -win2k, -winxp.  
+You can specify additional whitelist profiles and activate them using -wp
+<profile_name> at the Argos command line.
+.Sp
+Example:
+.Sp
+/etc/argos-whitelist:
+.br
+winxp:  call 0x77d48706
+.br
+winxpsp2:  call 0x76d48706
+.Sp
+argos ... -winxp -wp winxpsp
+.Sp
+To identify the offending instruction(s) to add to the whitelist, run your
+guest system without allowing incoming network connections and access a safe
+network location.  In my case an openSSH connection to the guest reveals the 
+address.
+.Sp
+It is better to use the -no-fsc and maybe even -no-csilog, to keep the guest 
+runnning and get more hits on the offending instruction just to be sure that
+you did not stumble on something else.
+.Sp
+The alert should look something like this
+[ARGOS] Attack detected, code <JMP> PC <c03ec632> TARGET <c03ec6e8>
+.SH "SEE ALSO"
+.IX Header "SEE ALSO"
+qemu(1)
+.SH "AUTHOR"
+.IX Header "AUTHOR"
+Georgios Portokalidis

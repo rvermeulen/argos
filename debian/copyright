@@ -1,0 +1,34 @@
+This package was debianized by Georgios Portokalidis <porto@cs.vu.nl> on
+Sat, 01 Mar 2008 22:30:38 +0100.
+
+It was downloaded from https://gforge.cs.vu.nl/projects/argos
+
+Upstream Author(s): 
+
+    Georgios Portokalidis <porto@cs.vu.nl>
+
+Copyright: 
+
+    Copyright (C) 2008 Georgios Portokalidis
+
+License:
+
+    Argos as a whole is released under the GNU General Public License.
+    On Debian systems, the complete text of the GNU General Public License
+    can be found in the file /usr/share/common-licenses/GPL.
+
+    Parts of Argos have specific licenses which are compatible with the
+    GNU General Public License. Hence each source file contains its own
+    licensing information.
+
+    In particular, the QEMU virtual CPU core library (libqemu.a) is
+    released under the GNU Lesser General Public License. On Debian systems,
+    the complete text of the GNU Lesser General Public License can be found
+    in the file /usr/share/common-licenses/LGPL.
+
+    Many hardware device emulation sources are released under the BSD license.
+    On Debian systems, the complete text of the BSD license be found in the
+    file /usr/share/common-licenses/BSD.
+
+The Debian packaging is (C) 2008, Georgios Portokalidis <porto@cs.vu.nl> and
+is licensed under the GPL, see `/usr/share/common-licenses/GPL'.

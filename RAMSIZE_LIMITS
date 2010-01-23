@@ -1,0 +1,23 @@
+ARGOS EMULATED RAM SIZE LIMITATIONS
+===================================
+The maximum size of emulated RAM has been set to avoid situations, where we hit
+the Linux process maximum virtual memory barrier, and Argos has to exit.
+
+The limits has been set to incorporate the size of data that are need, or could
+be required for the smooth operation of Argos.
+
+When not running in net tracker mode, we require an extra byte for each byte of
+RAM. This means that we can safely emulate up to 1.25G of RAM.
+
+On the other hand net tracker mode requires 4 bytes for each byte of RAM (the
+index of the byte within the network trace is stored). This forces the limit to
+be set to 512M of RAM. Even though lowmem mode can be used to dynamically
+allocate the needed memory, the guest OS should be able to allocate 5 times the
+size of RAM at any time or it will exit.
+
+The only reasonable solution to this problem was to introduce these limits. In
+the future, we might look into new methods to limit memory usage with reasonable
+performance penalties.
+
+Kind regards,
+Georgios Portokalidis

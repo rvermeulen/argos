@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# Simply configure tap interface with an IP address
+sudo -p "Password for $0:" /sbin/ifconfig $1 172.20.0.1 up
+
+# Use bridging instead
+# sudo -p "Password for $0:" /sbin/brctl addif br0 $1
+# sudo /sbin/ifconfig $1 0.0.0.0 promisc up

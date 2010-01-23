@@ -1,0 +1,39 @@
+argos (0.4.1-2) unstable; urgency=low
+
+  * argos-tag.h: Added definition of argos_paddr_t to avoid syntax error, because of lack of definition of target_ulong
+
+argos (0.4.1-1) unstable; urgency=low
+
+  * softmmu_header.h & softmmu_template.h: Added const definition for argos tags in memory store operations
+  * softmmu_header.h: Fixed floating point memory store operations. Operations now call argos_st... related functions with the argos_clean_tag. This seems to fix the false positives encountered with windows systems
+  * target-i386/op.c: Re-enabled call instruction checking
+  * target-i386/argos-mmxop.h: Fixed MMX tracking errors
+  * target-i386/argos-bytemap.h: Replaced movq, and movdq operations with memcpy()
+  * argos-config.h: Added definition of ARGOS_BITMAP. The lack of definition effectively disabled the use of bitmap, reverting back to the use of a bytemap
+  * argos-common.h: argos_os_hint and argos_nt_fl declared only for system emulation
+  * Makefile.target: argos_whitelist.o moved to LIBOBJS
+  * argos-config.h: Removed empty comment line
+  * softmmu_header.h: Removed duplicate includes for argos.h and argos-memmap.h
+  * linux-user/main.c: Moved port I/O, and  x86 CPU core interface functions to common.c
+  * cpu-exec.c: Replaced references to EIP with env->eip
+  * target-i386/argos-memmap.h: Fixed dummy memmory map create functions so no warning is issued by the compiler when they are used
+  * target-i386/argos-alert.c: Removed control socket interface from user-space emulator. Added alert code correction by checking whether the loaded value is actually clean
+  * target-i386/argos-csi.h: Removed physical address related parts from the user-space emulator
+  * target-i386/argos-check.h: Removed physical address related parts from the user-space emulator 
+  * cpu-all.h: Added argos load/store macros, and moved argos global variables extern declaration higher in the file
+
+ -- G Portokalidis <porto_@users.sourceforge.net>  Sat, 21 May 2008 22:30:38 +0100
+
+argos (0.4.0-1) unstable; urgency=low
+
+  * Ported to Qemu 0.9.1
+  * argos-check.*: Reinstated jump target taint checking. Needed for TB
+    chaining.
+
+ -- G Portokalidis <porto_@users.sourceforge.net>  Sat, 01 Mar 2008 22:30:38 +0100
+
+argos (0.3.1-1) unstable; urgency=low
+
+  * Debian Package Initial Release
+
+ -- G Portokalidis <porto_@users.sourceforge.net>  Sun, 10 Feb 2008 18:50:49 +0100

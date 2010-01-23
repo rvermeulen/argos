@@ -1,0 +1,13 @@
+ARGOS EMULATOR VERSION 0.4.0
+============================
+
+Argos was finally ported to QEMU version 0.9.1. Please read QEMU's documentation
+for details on changes since version 0.8.2 (previously used by Argos).
+
+Additional changes, besides the port, include a double taintness check before 
+executing a part of code to ensure attackers' injected code is always detected 
+at the moment it is first executed. The check is performed whenever a TB is
+is scheduled to be executed, as well as within the translated code whenever EIP
+is modified. This is to cover TB chaining performed by QEMU to speed up
+emulation. In the future we might consider disabling chaining, if a single check
+offers a significant performance gain.

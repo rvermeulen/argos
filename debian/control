@@ -1,0 +1,22 @@
+Source: argos
+Section: misc
+Priority: optional
+Maintainer: G Portokalidis <port_@users.sourceforge.net>
+Build-Depends: debhelper (>= 5), autotools-dev, binutils (>= 2.16-1),
+ gcc-3.4, libx11-dev, libsdl1.2-dev (>> 1.2.1), libncurses5-dev, zlib1g-dev,
+ libasound2-dev
+Standards-Version: 3.7.2
+
+Package: argos
+Architecture: i386
+Depends: ${shlibs:Depends}
+Description: Emulator for capturing zero-day attacks
+ Argos is a full and secure system emulator designed for use in honeypots.
+ It is based on Qemu, an open source emulator that uses dynamic translation
+ to achieve a fairly good emulation speed.
+ General features:
+ * Does not require any modification of the guest operating system
+ * Supports multiple guest operating systems including Linux,
+   Windows 2000 and Windows XP (all QEMU supported guest OSes)
+ * Emulates x86 processors, including MMX, SSE and SS2 extensions
+ * Runs on multiple OSes (Linux/Unix, Windows) and CPUs (x86, x86_64, PowerPC)

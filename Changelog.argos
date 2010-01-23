@@ -1,0 +1,316 @@
+2009-04-08 R Vermeulen
+* argos-alert.h: Fixed ARGOS_CHECK(). Macro was not updated to latest format 
+for the case that checks are disabled (#define DISABLE_ARGOS_CHECK)
+
+2009-03-27 G Portokalidis
+* vl.c: Fixed critical error in argos_logf() that caused Argos to crash if the 
+control socket is not used
+
+2009-03-25 G Portokalidis
+* argos.1: Minor corrections
+* configure: Added whitelist option. Whitelisting will be enabled only if Argos
+is configured with it
+* ctrl_socket.?: Removed. Control socket implementation, is no longer using a
+seperate thread. Instead, it's integrated with the main IO select() in vl.c.
+Reading is non-blocking. Writing is done using argos_logf() and is blocking! Use
+with care
+* hw/cirrus_vga.c: Remove some old and unused debugging code
+* target-i386/argos-alert.c: If no forensics shellcode is injected, the
+execution of tainted code is allowed. This does not guarantee that the code will
+actually run, since QEMU seems to not handle the injected code properly
+* target-i386/argos-bytemap.c: Replaced fprintf() with qemu_fprintf()
+* target-i386/argos-check.h: Made the taint check macros have a consistent
+interface
+* target-i386/argos-csi.c: Replaced argos_mblock_write() with a more
+multi-purpose argos_process_proc(), which can be also used for cleaning a
+process's state
+* target-i386/argos-debug.h: Added conditional debug messaging macros
+* target-i386/op.c: Modifications to support new taint checking macros
+* target-i386/translate.c: Made instruction whitelist optional
+
+2008-05-21 G Portokalidis
+* argos-tag.h: Added definition of argos_paddr_t to avoid syntax error, because
+of lack of definition of target_ulong
+
+2008-05-19 G Portokalidis
+* softmmu_header.h & softmmu_template.h: Added const definition for argos tags 
+in memory store operations
+* softmmu_header.h: Fixed floating point memory store operations. Operations
+now call argos_st... related functions with the argos_clean_tag. This seems to
+fix the false positives encountered with windows systems
+* target-i386/op.c: Re-enabled call instruction checking
+* target-i386/argos-mmxop.h: Fixed MMX tracking errors
+* target-i386/argos-bytemap.h: Replaced movq, and movdq operations with memcpy()
+
+2008-03-07 G Portokalidis
+* argos-config.h: Added definition of ARGOS_BITMAP. The lack of definition
+effectively disabled the use of bitmap, reverting back to the use of a bytemap
+
+2008-03-06 G Portokalidis
+* argos-common.h: argos_os_hint and argos_nt_fl declared only for system
+emulation
+* Makefile.target: argos_whitelist.o moved to LIBOBJS
+* argos-config.h: Removed empty comment line
+* softmmu_header.h: Removed duplicate includes for argos.h and argos-memmap.h
+* linux-user/main.c: Moved port I/O, and  x86 CPU core interface functions to
+common.c
+* cpu-exec.c: Replaced references to EIP with env->eip
+* target-i386/argos-memmap.h: Fixed dummy memmory map create functions so no
+warning is issued by the compiler when they are used
+* target-i386/argos-alert.c: Removed control socket interface from user-space
+emulator. Added alert code correction by checking whether the loaded value is
+actually clean
+* target-i386/argos-csi.h: Removed physical address related parts from the
+user-space emulator
+* target-i386/argos-check.h: Removed physical address related parts from the
+user-space emulator
+* cpu-all.h: Added argos load/store macros, and moved argos global variables
+extern declaration higher in the file
+
+2008-02-28 G Portokalidis
+* Ported to Qemu 0.9.1. See QEMU's Changelog.
+* argos-check.*: Reinstated jump target taint checking. Needed for TB chaining.
+
+2008-02-04 G Portokalidis
+* target-i386/argos-check.h: Fixed ARGOS_CHECK() to set new eip, and to make
+visible forensics code redirection
+* target-i386/op.c: Updated jmp functions to work with new ARGOS_CHECK()
+
+2007-12-20 G Portokalidis
+* target-i386/op.c: Removed operand taintness check for simple call
+
+2007-11-07 G Portokalidis
+* hw/ide.c: Replaced QEMU in HD and CD-ROM model names with something more
+reasonable
+* vnc.c: Corrected VNC window title to 'ARGOS'
+* translate-all.c: Set default code_copy_enabled value to 0 (false)
+* cpu-exec.c: Removed general purpose register tags saving, since no CPU
+registers are used for holding any of the tags
+* cpu-exec.c: Added check for executing tainted code before calling gen_func()
+* exec.c: Removed argos_regtags array, general purpose register tags are now
+held within the CPU environment structure (env). Made PhysPageDesc type and
+phys_page_find() function public to correctly locate remapped physical pages.
+Remapping physical memory also cleans the regions involved
+* configure: Removed --enable-cionly option. Added --enable-dyntags options that
+enables per page dynamic memory tags allocations. Options --enable-lowmem
+remains, but now statically allocates a memory map for RAM which uses a bitmap
+instead of a bytemap
+* argos-assert.h: Added generic assertion macros
+* argos-whitelist.*: Added a whitelist for certain instructions (jmp, call, ret)
+based on their (virtual) address. Whitelisted instructions are not checked for
+taintness of their operands
+* target-i386/argos-bitmap.*: Added bitmap implementation. A single bit is
+allocated for tagging each memory location
+* target-i386/ops_template.h: Port I/O instructions don't rely on virtual HW to
+clear tags, but now do it themselves 
+* target-i386/opreg_template.h: Added special argos operation to clear a tag,
+used when translating SBB instructions
+* target-i386/op.c: Replaced op_*_jmp_T0() operations with op_argos_*_jmp_T0().
+op_jmp_T0() is now used for whitelisted instructions, and does not perform any
+check
+* target-i386/argos.h: Added bitmap memory map type
+* target-i386/argos-memmap.h: Added bitmap macros
+* target-i386/cpu.h: General purpose register tags are now located in the CPU
+environment structure
+* target-i386/translate.c: Added support for SBB, SUB operations when used to
+clean a register. Added whitelist support
+* target-i386/helper2.c: Replaced QEMU virtual CPU text with Intel PII text
+*target-i386/argos-alert.c: Added extra codes for extra verbosity
+*target-i386/argos-check.h: Updated to accurately calculate PC before jumping,
+and passing the information to the alert function
+* target-i386/argos-check.c: Removed
+* target-i386/argos-csi.*: Updated to match the new check and alert routines.
+Fixed bug where code privilege level was calculated erroneously because of bit
+mask not being applied correctly
+* target-i386/exec.h: Registers' macro names updated to point to CPU environment
+structure
+* hw/ne2000.c: Fixed network byte index not being reset when the VM was
+restarted
+* hw/acpi.c, hw/pc.c: Removed memory tag cleaning, it is now performed centrally
+when physical memory is remapped
+* vl.c: Added new option to set a whitelist profile to be used
+
+2007-09-11 G Portokalidis
+* target-i386/argos-pagemap.h: Corrected argos_pagemap_clear() page iterating
+
+2006-12-01 G Portokalidis
+* target-i386/argos-bytemap.c: Argos exits when no memory can be allocated
+* target-i386/argos-pagemap.c: Removed memory allocation routines
+* argos-alert.c/argos-alert.h: Moved to target-i386/
+* vl.c: Added constraints on the size of virtual RAM, to avoid hitting the linux
+process virtual memory barrier (3G)
+
+
+2006-12-01 G Portokalidis
+* target-i386-argos-pagemap.h: Fixed bug in argos_pagemap_create(). High
+addresses were not initialised.
+
+2006-11-29 G Portokalidis
+* target-i386/argos-mmxop.h: Various fixes, and performance optimisations. MMX
+tracking operations' semantics have slightly changed, ARGOS_ENVMAP_OFFSET()
+gives the MMX memory address, given an mmx register address
+* target-i386/argos-check.c: Split file to argos-alert.c and argos-alert.h
+* target-i386/helper.c: Increased tracking of cmpxchg operation
+* vl.c: Added initialisation of random number generator using srand(time())
+
+2006-11-14 G Portokalidis
+* vl.c: Fixed -no-fsc option, which disables forensics shellcode injection
+* softmmu_template.h: Removed XXX notes
+* target-i386/argos.c: Fixed clearing of registers, in case that guest arch has
+more registerts than guest
+* target-i386/helper.c: Minor type fix (argos_tag_cler())
+
+2006-11-01 G Portokalidis
+* vl.c: qemu_system_reset() truncates argos net tracker log to zero, when system
+is reset
+
+2006-10-16 G Portokalidis
+* Makefile: Removed argos.1 from list of files that get deleted on distclean.
+
+2006-10-12 G Portokalidis
+* target/-i386: Added argos_sanitize_process() to clean the tags of
+an attacked process. This removes of the posibility of multiple alerts for a
+single attack
+
+2006-10-12 G Portokalidis
+* ctrl-socket.h: Added new command definitions for pausing and resuming VM
+* ctrl-socket.c: Added implementation for pausing and resuming VM
+
+2006-10-10 G Portokalidis
+* softmmu-template.h: io_mem_write() added support to handle I/O memory writes
+for memory marked as "notdirty"
+* exec.c: notdirty_mem_write() writes no longer clear memory tags, but instead
+track the written value
+* exec.c: Added globals argos_io_write_tag, argos_clean_tag to assist in
+tracking IO memory writes
+* cpu-all.h: Added definitions of the forementioned globals
+* vl.c: Added initialisation of the forementioned globals
+* target-i386/helper.c: Added missing tracking for certain memory read/write
+sequences
+
+2006-10-06 G Portokalidis
+* hw/ne2000.c: ne2000_receive() corrected bug that caused erroneous network data
+logging. Instead of writing the length of an ethernet frame's data, the length
+of the ne2000 header was included (+4)
+* target-i386/argos.csi.c: argos_mblock_header_init() Removed big endianess flag
+from memory block header
+* target-i386/argos.csi.c: argos_mblock_header_init() Corrected bug in logging
+of tainted memory pages
+
+2006-09-25 G Portokalidis
+*target-i386/argos-csi.c: Removed printf() when forensics shellcode is injected 
+*ctrl-socket.c: Support for a control socket
+*ctrl-socket.h: Control socket definitions
+*vl.c: Support for control socket
+
+2006-09-23 G Portokalidis
+*target-i386/argos-mmxop.h: Major changes in the MMX tracking. More accurate +
+bugs fixed
+*target-i386/softmmu-template.h: Fix inaccurate tainting when reading from
+between 2 memory pages
+In general a big part of the code was re-written. Diff with previous version
+will produce a lot of output.
+
+2006-08-24 G Portokalidis
+*target-i386/argos-pagemap.h: Added a seperate argument for map address
+*target-i386/argos-bytemap.h: Added a seperate argument for map address
+*target-i386/argos-memop.h: Update macros to include map address argument
+2006-06-22 G Portokalidis
+* target-i386/argos-op.h: Changed ARGOS_NE2000_READ() to ARGOS_NE2000_TAINT()
+* hw/ne2000.c:
+	* Fixed tainting design flaw. The same memory buffer is used for tainted
+	* and clean data. Added an additional memory tracking array to keep
+	* account of the tainted data.
+
+2006-06-21 G Portokalidis
+* configure: Added --enable-net-tracker option to enable net tracker mode
+* target-i386/argos-config.h: Net tracker mode enables low memory mode
+* target-i386/argos.h: Added network tracker index for register tags
+* target-i386/argos-op.h: Added network index argument for net tracker mode to ARGOS_NE2000_READ()
+* hw/ne2000.c: Added net tracker support.
+
+2006-06-13 G Portokalidis
+* Released version 0.1.4
+
+2006-06-13 G Portokalidis
+* configure: Added --enable-lowmem option
+* hw/pc.c: Minor bug correction in memory cleaning
+* vl.c: Temporarily disabled restoring tags
+* target-i386/argos-bytemap.h: Changed bytemap from macros to static inline functions
+* target-i386/argos-debug.c: Added file containing debugging functions
+* target-i386/argos-debug.h: Added file declaring debugging functions
+* target-i386/argos-glue.h: Added glue macro definition to avoid including long qemu headers
+* target-i386/argos-memop.c: Removed
+* target-i386/argos-memop.h: Updated to include pagemap and changed macros to static inline functions
+* target-i386/argos-mmxop.h: Bug corrections and changed macros to static inline functions
+* target-i386/argos-op.h: More strict tracking, and changed some macros to static inline functions
+* target-i386/argos-pagemap.h: Pagemap memory tracking model for low memory systems
+* target-i386/argos.h: Added register tags structure definition
+* target-i386/argos-rtag.h: Removed register tag structure definition
+
+2006-06-03 G Portokalidis
+* target-i386/argos-csi.c: Changed ARGOS_MAP_CLEAR call to ARGOS_MEM_CLEAR
+* Released version 0.1.3
+
+2006-05-31 G Portokalidis
+* target-i386/argos-mmxop.h: New file containing MMX tracking macros
+* target-i386/ops_sse.h: Added MMX registers tracking
+* target-i386/op.c: Added MMX registers tracking
+* target-i386/helper.c: Added MMX registers tracking
+* target-i386/ops_mem.h: Added MMX registers tracking
+* target-i386/argos-memop.h: Removed MMX tracking macros
+* target-i386/argos-reg.h: Removed MMX tracking macros
+* target-i386/argos.c: Added bytemap for tracking the MMX registers
+* target-i386/argos-bytemap.h: Added bytemap copy macros
+* target-i386/argos-config.h: Added ARGOS_MMX_ENABLE flag
+
+2006-05-11 G Portokalidis
+* Released version 0.1.2
+
+2006-05-10 G Portokalidis
+* hw/pc.c: Instrumented memory store instructions initialisation phase
+* vl.c: Updated copyright info
+* ARGOS_VERSION: Added Argos version information
+* exploits.sxc: Added war_ftpd_user metasploit exploit
+* argos-ifup: Added ethernet bridge code
+
+2006-05-09 G Portokalidis
+* target-i386/argos-mem.h: Renamed to argos-memop.h
+* target-i386/argos-mem.c: Renamed to argos-memop.c
+* target-i386/argos-tag.h: New file containing tag definitions
+* target-i386/argos-reg.h: Renamed to argos-op.h
+* Changed license from LGPL to BSD
+* target-i386/argos-bytmap.h: Macro names changed from *_BYTEMAP_* *_MAP_*
+* target-i386/argos-memop.h: Memory tracking back-end is enabled by including
+* the appropriate header file, e.g. argos-bytemap.h
+* Makefile.target: Update to reflect file name changes
+* target-i386/argos-config.h: New file containing configuration options 
+* target-i386/cpu.h: Update includes to reflect file name changes
+
+2006-04-22 G Portokalidis
+
+* config-host.mak: Changed more paths from "qemu" to "argos".
+* target-i386/argos-mem.h: Disabled bitmap support.
+
+
+2006-03-06 G Portokalidis
+
+* cpu_exec.c: Added T0 register tracking.
+* sdl.c: Changed window name from `QEMU' to `ARGOS'.
+* vl.c: Added load/save state support. Support for loading QEMU saved states as
+well as ARGOS saved states.
+* target-i386/op.c: Minor bug fixes.
+* target-i386/argos-reg.h: Fixed multiplication and divide operations tracking.
+* config-host.h: Changed argos share directory to /usr/local/share/argos
+* target-i386/: Removed argos-bitmap.c, argos-bitmap.h
+* target-i386/argos-bytemap.h: ARGOS_BYTEMAP_CLEAR now uses real RAM address
+
+
+2005-12-22 G Portokalidis
+
+* kqemu/ : Removed kernel accelerator, because of licensing issues.
+
+
+2005-12-20 G Portokalidis
+
+* First public release
