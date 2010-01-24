@@ -144,6 +144,4 @@ typedef struct argos_shellcode_context_s
     #define ARGOS_NETIDXPTR(X) ( argos_memmap_ntdata(ARGOS_OFFSET((X))) )
 #endif
 
-int get_current_instr_len(target_ulong eip, unsigned long phys_pc);
-
 #endif
