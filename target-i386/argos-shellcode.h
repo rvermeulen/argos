@@ -49,7 +49,6 @@
 // to track the execution of shellcode and the bytes referenced by
 // the shellcode instructions.
 
-// TODO: optimize struct usage.
 typedef struct argos_shellcode_context_s
 {
     // Is there an instance of shellcode running.
@@ -63,10 +62,6 @@ typedef struct argos_shellcode_context_s
     FILE* logfile;
     // The number of shell-code instructions executed.
     unsigned instruction_cnt;
-    // The stage of the instruction being executed.
-    unsigned instruction_stage;
-    // The highest stage in the current execution of shell-code.
-    unsigned trace_stage;
     // Is the instruction pointed to by the eip a system call.
     unsigned is_system_call;
     // We use the current eip to check if memory references are related/performed
@@ -80,24 +75,28 @@ typedef struct argos_shellcode_context_s
     unsigned short instruction_size;
     // Did we logged something.
     unsigned logged;
+#ifdef ARGOS_NET_TRACKER
+    // The stage of the instruction being executed.
+    unsigned instruction_stage;
+    // The highest stage in the current execution of shell-code.
+    unsigned trace_stage;
     // corresponding raw net id.
     argos_netidx_t instruction_netidx[MAX_INSTRUCTION_SIZE];
-    // Bytes loaded by the instruction
-    target_ulong load_value;
     // Sometimes we retrieve the netidx before logging, so we cache it here
     argos_netidx_t * load_value_netidx;
+    // Sometimes we retrieve the netidx before logging, so we cache it here
+    argos_netidx_t * store_value_netidx;
+#endif
+    // Bytes loaded by the instruction
+    target_ulong load_value;
     // Address of the bytes loaded by the instruction
-    //target_ulong load_addr;
     unsigned long load_addr;
     unsigned char load_addr_type;
     // Number of loaded bytes
     unsigned load_size;
     // Bytes stored by the instruction
     target_ulong store_value;
-    // Sometimes we retrieve the netidx before logging, so we cache it here
-    argos_netidx_t * store_value_netidx;
     // Address of the bytes loaded by the instruction
-    //target_ulong store_addr;
     unsigned long store_addr;
     unsigned char store_addr_type;
     // Number of stored bytes
@@ -143,9 +142,6 @@ typedef struct argos_shellcode_context_s
 // The phys_ram_base is stripped by the ARGOS_OFFSET(X) macro, so it must be added to the returned offset.
 #ifdef ARGOS_NET_TRACKER
     #define ARGOS_NETIDXPTR(X) ( argos_memmap_ntdata(ARGOS_OFFSET((X))) )
-#else
-    // If the ARGOS_NET_TRACKER is not defined we assign NULL
-    #define ARGOS_NETIDXPTR(X) ( 0 )
 #endif
 
 int get_current_instr_len(target_ulong eip, unsigned long phys_pc);

@@ -8288,8 +8288,6 @@ static int main_loop(void)
 #ifdef CONFIG_PROFILER
                 qemu_time += profile_getclock() - ti;
 #endif
-
-//#ifdef ARGOS_NET_TRACKER
                 // Check whether as system call is performed during the tracking of shell-code. 
                 if (env->shellcode_context.running && env->shellcode_context.is_system_call)
                 {
@@ -8298,15 +8296,17 @@ static int main_loop(void)
                     {
                         env->shellcode_context.is_system_call = 0;
                         env->shellcode_context.running = 0;
-                        // The system call number resides in the register eax for the int 0x2e as well for the sysenter system call 
-                        // mechanism.
-                        fprintf(env->shellcode_context.logfile, "Prevented shellcode from calling system call 0x%x.\n", env->regs[R_EAX]);
+                        // The system call number resides in the register eax for the int 0x2e
+                        // as well for the sysenter system call mechanism.
+                        fprintf(env->shellcode_context.logfile,
+                                "Prevented shellcode from calling system call 0x%x.\n",
+                                env->regs[R_EAX]);
+
                         fclose(env->shellcode_context.logfile);
                         // For now we just pause the vm.
                         vm_stop(0);
                     }
                 }
-//#endif
 
                 next_cpu = env->next_cpu ?: first_cpu;
                 if (event_pending) {
@@ -8343,7 +8343,6 @@ static int main_loop(void)
             }
             if (ret == EXCP_DEBUG) 
             {
-//#ifdef ARGOS_NET_TRACKER
                 // Here we are going to log the instructions that belong to the shellcode.
                 // This is after the execution of the instruction so the eip register points
                 // to the next instruction.
@@ -8356,13 +8355,15 @@ static int main_loop(void)
 
 #ifdef ARGOS_NET_TRACKER
                         // Check if we are executing an instruction at a new stage.
-                        if ( env->shellcode_context.trace_stage < env->shellcode_context.instruction_stage )
+                        if ( env->shellcode_context.trace_stage <
+                                env->shellcode_context.instruction_stage )
                         {
                             fprintf(env->shellcode_context.logfile, "Stage %u -> %u\n", 
                                     env->shellcode_context.trace_stage,
                                     env->shellcode_context.instruction_stage);
 
-                            env->shellcode_context.trace_stage = env->shellcode_context.instruction_stage;
+                            env->shellcode_context.trace_stage =
+                                env->shellcode_context.instruction_stage;
                         }
 #endif // ARGOS_NET_TRACKER
 
@@ -8373,9 +8374,10 @@ static int main_loop(void)
                         fprintf(env->shellcode_context.logfile, "\t");
 
                         // Print the instruction.
-                        // NOTE: this must be replaced with the libdasm version since it supports more
-                        // options for formatting.
-                        disas_instr(env->shellcode_context.logfile, env->shellcode_context.instruction,
+                        // NOTE: this must be replaced with the libdasm version since it 
+                        // supports more options for formatting.
+                        disas_instr(env->shellcode_context.logfile,
+                                env->shellcode_context.instruction,
                                 env->shellcode_context.instruction_size);
 
                         fprintf(env->shellcode_context.logfile, "\t");
@@ -8384,8 +8386,8 @@ static int main_loop(void)
                         // Print the bytes of the instruction
                         for (i = 0; i < env->shellcode_context.instruction_size; i++)
                         {
-                            fprintf(env->shellcode_context.logfile, "%x ", 
-                                    env->shellcode_context.instruction[i] & 0xff);
+                            fprintf(env->shellcode_context.logfile, "%x ",
+                                    env->shellcode_context.instruction[i] & 0xFF);
                         }
                         fprintf(env->shellcode_context.logfile, "\t");
 
@@ -8393,16 +8395,19 @@ static int main_loop(void)
                         // Print the netidx's of the instruction bytes.
                         for (i = 0; i < env->shellcode_context.instruction_size; i++)
                         {
-                            fprintf(env->shellcode_context.logfile, "[%u] ", 
-                                    ARGOS_GET_NETIDX(env->shellcode_context.instruction_netidx[i]));
+                            fprintf(env->shellcode_context.logfile, "[%u] ",
+                                    ARGOS_GET_NETIDX(
+                                        env->shellcode_context.instruction_netidx[i])
+                                    );
                         }
 
                         fprintf(env->shellcode_context.logfile, "\t");
 #endif // ARGOS_NET_TRACKER
 
-                        // If the instruction performed a load, print the address of the load and
-                        // the value loaded.
-                        if (env->shellcode_context.loadedby_eip == env->shellcode_context.executed_eip)
+                        // If the instruction performed a load, print the address of the load
+                        // and the value loaded.
+                        if (env->shellcode_context.loadedby_eip ==
+                                env->shellcode_context.executed_eip)
                         {
 
                             fprintf(env->shellcode_context.logfile, " <- @0x%lx (0x%x) ",
@@ -8416,11 +8421,15 @@ static int main_loop(void)
                             for (i = 0; i < env->shellcode_context.load_size; i++)
                             {
                                 argos_netidx_t* netidx;
-                                // TODO: check if address is guest virtual or guest physical address!
-                                // Not all cases are checked, which can result in an invalid netidx.
-                                if (env->shellcode_context.load_addr_type == ARGOS_HOST_VIRTUAL_ADDR)
+                                // TODO: check if address is guest virtual or guest physical 
+                                // address!
+                                // Not all cases are checked, which can result in an invalid 
+                                // netidx.
+                                if (env->shellcode_context.load_addr_type ==
+                                        ARGOS_HOST_VIRTUAL_ADDR)
                                 {
-                                    netidx = ARGOS_NETIDXPTR(env->shellcode_context.load_addr + i);
+                                    netidx = ARGOS_NETIDXPTR(env->shellcode_context.load_addr +
+                                            i);
                                 }
                                 else
                                 {
@@ -8436,15 +8445,19 @@ static int main_loop(void)
 
                                 if (netidx != 0)
                                 {
-                                    // We cannot always retrieve the address fo the guest, so we annotate the 
-                                    // address to show that it a host virtual address.
-                                    if (env->shellcode_context.load_addr_type == ARGOS_HOST_VIRTUAL_ADDR)
+                                    // We cannot always retrieve the address fo the guest,
+                                    // so we annotate the address to show that it a host virtual
+                                    // address.
+                                    if (env->shellcode_context.load_addr_type == 
+                                            ARGOS_HOST_VIRTUAL_ADDR)
                                     {
-                                        fprintf(env->shellcode_context.logfile, "@[%u] ", ARGOS_GET_NETIDX(*netidx));
+                                        fprintf(env->shellcode_context.logfile, "@[%u] ",
+                                                ARGOS_GET_NETIDX(*netidx));
                                     }
                                     else
                                     {
-                                        fprintf(env->shellcode_context.logfile, "[%u] ", ARGOS_GET_NETIDX(*netidx));
+                                        fprintf(env->shellcode_context.logfile, "[%u] ",
+                                                ARGOS_GET_NETIDX(*netidx));
                                     }
                                 }
                                 else
@@ -8461,7 +8474,8 @@ static int main_loop(void)
                         }
 
                         // If the instruction performed a store, print the store address and value.
-                        if (env->shellcode_context.storedby_eip == env->shellcode_context.executed_eip)
+                        if (env->shellcode_context.storedby_eip ==
+                                env->shellcode_context.executed_eip)
                         {
                             fprintf(env->shellcode_context.logfile, " -> @0x%lx (0x%x) ",
                                     env->shellcode_context.store_addr,
@@ -8474,7 +8488,8 @@ static int main_loop(void)
                             {
                                 argos_netidx_t* netidx;
 
-                                if (env->shellcode_context.store_addr_type == ARGOS_HOST_VIRTUAL_ADDR)
+                                if (env->shellcode_context.store_addr_type == 
+                                        ARGOS_HOST_VIRTUAL_ADDR)
                                 {
                                     netidx = ARGOS_NETIDXPTR(env->shellcode_context.store_addr + i);
                                 }
@@ -8492,13 +8507,16 @@ static int main_loop(void)
 
                                 if (netidx != 0)
                                 {
-                                    if (env->shellcode_context.store_addr_type == ARGOS_HOST_VIRTUAL_ADDR)
+                                    if (env->shellcode_context.store_addr_type == 
+                                            ARGOS_HOST_VIRTUAL_ADDR)
                                     {
-                                        fprintf(env->shellcode_context.logfile, "@[%u] ", ARGOS_GET_NETIDX(*netidx));
+                                        fprintf(env->shellcode_context.logfile, "@[%u] ",
+                                                ARGOS_GET_NETIDX(*netidx));
                                     }
                                     else
                                     {
-                                        fprintf(env->shellcode_context.logfile, "[%u] ", ARGOS_GET_NETIDX(*netidx));
+                                        fprintf(env->shellcode_context.logfile, "[%u] ",
+                                                ARGOS_GET_NETIDX(*netidx));
                                     }
                                 }
                                 else
@@ -8533,7 +8551,6 @@ static int main_loop(void)
                     }
                 }
                 else
-//#endif // ifdef ARGOS_NET_TRACKER
                 {
                         vm_stop(EXCP_DEBUG);
                 }

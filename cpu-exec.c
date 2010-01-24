@@ -305,7 +305,7 @@ int cpu_exec(CPUState *env1)
     uint32_t *saved_regwptr;
 #endif
 #endif
-    int ret, interrupt_request;
+    int ret = -1, interrupt_request;
     void (*gen_func)(void);
     TranslationBlock *tb;
     uint8_t *tc_ptr;
@@ -661,7 +661,6 @@ int cpu_exec(CPUState *env1)
                 }
                 tc_ptr = tb->tc_ptr;
                 env->current_tb = tb;
-                /* execute the generated code */
                 gen_func = (void *)tc_ptr;
 #if 0
 {
@@ -701,7 +700,6 @@ int cpu_exec(CPUState *env1)
                 fp.gp = code_gen_buffer + 2 * (1 << 20);
                 (*(void (*)(void)) &fp)();
 #else
-//#ifdef ARGOS_NET_TRACKER
         // Here we are saving context of the instructions that are 
         // executed during the tracking of shell-code.
         // Everything that is logged is before the execution of the 
@@ -714,7 +712,11 @@ int cpu_exec(CPUState *env1)
                     env->cr[3] == env->shellcode_context.cr3 &&
                     argos_dest_pc_isdirty(env, env->eip))
             {
-                unsigned i, max_stage = 0;
+#ifdef ARGOS_NET_TRACKER
+                unsigned i;
+                unsigned max_stage = 0;
+#endif // ARGOS_NET_TRACKER
+
                 // hph = host physical, gv = guest virtual, 
                 // and correspond to a memory address.
                 unsigned long hph_pc = 0, gv_pc = 0;
@@ -726,8 +728,9 @@ int cpu_exec(CPUState *env1)
                 hph_pc = get_phys_addr_code(env, gv_pc) +
                     /*(target_ulong)*/(unsigned long)phys_ram_base;
 
-                env->shellcode_context.instruction_size =
-                    get_current_instr_len(env->eip, hph_pc);
+                /*env->shellcode_context.instruction_size =
+                    get_current_instr_len(env->eip, hph_pc);*/
+                env->shellcode_context.instruction_size = env->current_tb->size;
 
                 memcpy(env->shellcode_context.instruction, (void *)(unsigned long)hph_pc,
                         env->shellcode_context.instruction_size);
@@ -760,11 +763,10 @@ int cpu_exec(CPUState *env1)
                         env->shellcode_context.instruction_netidx[i] = 0;
                     }
                 }
-#endif // ARGOS_NET_TRACKER
                 env->shellcode_context.instruction_stage = max_stage;
+#endif // ARGOS_NET_TRACKER
             }
         }
-//#endif
                 gen_func();
 #endif
                 env->current_tb = NULL;
@@ -775,7 +777,7 @@ int cpu_exec(CPUState *env1)
                     env->hflags &= ~HF_SOFTMMU_MASK;
                     /* do not allow linking to another block */
                     T0 = 0;
-		    argos_tag_clear(T0TAG);
+                    argos_tag_clear(T0TAG);
                 }
 #endif
 #if defined(USE_KQEMU)
@@ -791,7 +793,7 @@ int cpu_exec(CPUState *env1)
         {
             env_to_regs();
 
-            /* Take care of the int 2E system call before it is called */
+            /* Take care of the int 2E or sysenter system call before it is called */
             if ( env->shellcode_context.running && env->shellcode_context.is_system_call )
             {
                 break;
