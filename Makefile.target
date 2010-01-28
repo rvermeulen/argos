@@ -303,7 +303,7 @@ CPPFLAGS+=-I$(SRC_PATH)/fpu
 ifeq ($(TARGET_ARCH), i386)
 LIBOBJS+=helper.o helper2.o \
 	 argos_cpu.o argos-debug.o argos-bytemap.o argos-alert.o argos-bitmap.o \
-	 argos-csi.o
+	 argos-csi.o argos-tracksc.o libdasm.o
 ifndef CONFIG_USER_ONLY
 LIBOBJS+= argos-check.o
 endif
@@ -312,7 +312,7 @@ endif
 ifeq ($(TARGET_ARCH), x86_64)
 LIBOBJS+=helper.o helper2.o \
 	 argos_cpu.o argos-debug.o argos-bytemap.o argos-alert.o argos-bitmap.o \
-	 argos-csi.o
+	 argos-csi.o argos-tracksc.o libdasm.o
 ifndef CONFIG_USER_ONLY
 LIBOBJS+= argos-check.o
 endif

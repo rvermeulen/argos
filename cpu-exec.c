@@ -700,73 +700,10 @@ int cpu_exec(CPUState *env1)
                 fp.gp = code_gen_buffer + 2 * (1 << 20);
                 (*(void (*)(void)) &fp)();
 #else
-        // Here we are saving context of the instructions that are 
-        // executed during the tracking of shell-code.
-        // Everything that is logged is before the execution of the 
-        // actual instruction.
-        if (env->shellcode_context.running)
-        {
-            // Check if we are executing a tainted instruction.
-            // This assumes that the shell-code is marked tainted by Argos.
-            if (env->shellcode_context.executed_eip != env->eip &&
-                    env->cr[3] == env->shellcode_context.cr3 &&
-                    argos_dest_pc_isdirty(env, env->eip))
-            {
-#ifdef ARGOS_NET_TRACKER
-                unsigned i;
-                unsigned max_stage = 0;
-#endif // ARGOS_NET_TRACKER
-
-                // hph = host physical, gv = guest virtual, 
-                // and correspond to a memory address.
-                unsigned long hph_pc = 0, gv_pc = 0;
-
-                gv_pc = env->segs[R_CS].base + env->eip;
-                // Casting the phys_ram_base to target_ulong will
-                // trim the address from 64 bits to 32 bits and yields
-                // a wrong address when executing Argos on an amd64 host.
-                hph_pc = get_phys_addr_code(env, gv_pc) +
-                    /*(target_ulong)*/(unsigned long)phys_ram_base;
-
-                /*env->shellcode_context.instruction_size =
-                    get_current_instr_len(env->eip, hph_pc);*/
-                env->shellcode_context.instruction_size = env->current_tb->size;
-
-                memcpy(env->shellcode_context.instruction, (void *)(unsigned long)hph_pc,
-                        env->shellcode_context.instruction_size);
-
-                env->shellcode_context.executed_eip = env->eip;
-                env->shellcode_context.logged = 1;
-
-#ifdef ARGOS_NET_TRACKER
-                memset(env->shellcode_context.instruction_netidx, 0,
-                        MAX_INSTRUCTION_SIZE);
-
-                for ( i = 0; i < env->shellcode_context.instruction_size;
-                        i++ )
+                if ( argos_tracksc_is_running(env) )
                 {
-                    argos_netidx_t* netidx = ARGOS_NETIDXPTR(hph_pc + i);
-                    if (netidx != 0)
-                    {
-                        // Currently the stage of the instruction equals 
-                        // to the highest stage of an individual 
-                        // instruction byte.
-                        if ( ARGOS_GET_STAGE(*netidx) > max_stage )
-                        {
-                            max_stage = ARGOS_GET_STAGE(*netidx);
-                        }
-                        env->shellcode_context.instruction_netidx[i] =
-                            *netidx;
-                    }
-                    else
-                    {
-                        env->shellcode_context.instruction_netidx[i] = 0;
-                    }
+                    argos_tracksc_store_context(env);
                 }
-                env->shellcode_context.instruction_stage = max_stage;
-#endif // ARGOS_NET_TRACKER
-            }
-        }
                 gen_func();
 #endif
                 env->current_tb = NULL;
@@ -793,10 +730,13 @@ int cpu_exec(CPUState *env1)
         {
             env_to_regs();
 
-            /* Take care of the int 2E or sysenter system call before it is called */
-            if ( env->shellcode_context.running && env->shellcode_context.is_system_call )
+            if ( argos_tracksc_is_running(env) )
             {
-                break;
+                /* Take care of the int 2E or sysenter system call before it is called */
+                if ( argos_tracksc_logged_system_call(env) )
+                {
+                    break;
+                }
             }
         }
     } /* for(;;) */

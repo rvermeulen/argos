@@ -56,16 +56,11 @@ void argos_reset(CPUX86State *env)
     memset(&env->t2tag, 0, sizeof(env->t2tag));
     memset(env->regtags, 0 , sizeof(argos_rtag_t) * CPU_NB_REGS);
 
-    // Initialize the structure that holds the context of the shell-code
-    // being tracked.
-    memset(&env->shellcode_context, 0, sizeof(argos_shellcode_context_t));
-
-    // Set the default condition when to stop executing and tracking
-    // shell-code.
-    env->shellcode_context.stop_condition = SSC_FIRST_SYSTEM_CALL;
+    argos_tracksc_init(env);
 }
 
 void argos_close(CPUX86State *env)
 {
     argos_bytemap_destroy(env->envmap,  ENVMAP_SIZE);
+    argos_tracksc_stop(env);
 }

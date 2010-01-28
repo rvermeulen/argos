@@ -465,7 +465,7 @@ typedef union {
 #endif
 
 #include "argos-tag.h"
-#include "argos-shellcode.h"
+#include "argos-tracksc-context.h"
 
 #define NB_MMU_MODES 2
 
@@ -506,12 +506,12 @@ typedef struct CPUX86State {
     uint32_t a20_mask;
 
     /* FPU state */
-	/* fpip and prev_fpip store respectively the ip of the last executed fpu instruction
-	   and the instruction before the last if any. We track the fpip before the last fpip
-	  so we can simplify the code in translate.c by using exceptions (not cpu exceptions!). 
-	*/
-	target_ulong fpip;
-	target_ulong prev_fpip;
+    /* fpip and prev_fpip store respectively the ip of the last executed fpu instruction
+       and the instruction before the last if any. We track the fpip before the last fpip
+       so we can simplify the code in translate.c by using exceptions (not cpu exceptions!). 
+       */
+    target_ulong fpip;
+    target_ulong prev_fpip;
 
     unsigned int fpstt; /* top of stack index */
     unsigned int fpus;

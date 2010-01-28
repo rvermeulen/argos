@@ -31,6 +31,8 @@
 #ifndef ARGOS_MEMOP_H
 #define ARGOS_MEMOP_H
 
+#include "argos-tracksc.h"
+
 /*
    The load and store raw macros are augmented with logging of the
    current eip, the bytes loaded or stored, the number of loaded or
@@ -107,7 +109,6 @@
 #define ARGOS_STl_kernel(addr, val, tag) argos_stl_kernel((addr), (val), (tag))
 #define ARGOS_STq_kernel(addr, val, tag) argos_stq_kernel((addr), (val), (tag))
 
-#ifdef ARGOS_NET_TRACKER
 // Store raw macros
 #define ARGOS_STb_raw(addr, val, tag) \
     do { \
@@ -261,103 +262,4 @@
         } \
     } while (0)
 
-#else
-// Store raw macros
-#define ARGOS_STb_raw(addr, val, tag) \
-    do { \
-        stb_raw((addr), val); \
-        ARGOS_MEMMAP_STb((addr), (tag));\
-        ARGOS_SAVE_STb_CONTEXT(addr, val, ARGOS_HOST_VIRTUAL_ADDR); \
-    } while (0)
-
-#define ARGOS_STw_raw(addr, val, tag) \
-    do { \
-        stw_raw((addr), val); \
-        ARGOS_MEMMAP_STw((addr), (tag)); \
-        ARGOS_SAVE_STw_CONTEXT(addr, val, ARGOS_HOST_VIRTUAL_ADDR); \
-    } while (0)
-
-#define ARGOS_STl_raw(addr, val, tag) \
-    do { \
-        stl_raw((addr), val); \
-        ARGOS_MEMMAP_STl((addr), (tag)); \
-        ARGOS_SAVE_STl_CONTEXT(addr, val, ARGOS_HOST_VIRTUAL_ADDR); \
-    } while (0)
-
-#define ARGOS_STq_raw(addr, val, tag) \
-    do { \
-        stq_raw((addr), val); \
-        ARGOS_MEMMAP_STq((addr), (tag));\
-        ARGOS_SAVE_STq_CONTEXT(addr, val, ARGOS_HOST_VIRTUAL_ADDR); \
-    } while (0)
-
-// Load user macros
-#define ARGOS_LDub_user(addr, var, tag) \
-    do { \
-        (var) = argos_ldub_user((addr), (tag)); \
-        ARGOS_SAVE_LDb_CONTEXT(addr, var, ARGOS_GUEST_VIRTUAL_ADDR); \
-    } while (0)
-
-#define ARGOS_LDsb_user(addr, var, tag) \
-    do { \
-        (var) = argos_ldsb_user((addr), (tag)); \
-        ARGOS_SAVE_LDb_CONTEXT(addr, var, ARGOS_GUEST_VIRTUAL_ADDR); \
-    } while (0)
-
-#define ARGOS_LDuw_user(addr, var, tag) \
-    do { \
-        (var) = argos_lduw_user((addr), (tag)); \
-        ARGOS_SAVE_LDw_CONTEXT(addr, var, ARGOS_GUEST_VIRTUAL_ADDR); \
-    } while (0)
-
-#define ARGOS_LDsw_user(addr, var, tag) \
-    do { \
-        (var) = argos_ldsw_user((addr), (tag)); \
-        ARGOS_SAVE_LDw_CONTEXT(addr, var, ARGOS_GUEST_VIRTUAL_ADDR); \
-    } while (0)
-
-#define ARGOS_LDl_user(addr, var, tag) \
-    do { \
-        (var) = (uint32_t)argos_ldl_user((addr), (tag)); \
-        ARGOS_SAVE_LDl_CONTEXT(addr, var, ARGOS_GUEST_VIRTUAL_ADDR); \
-    } while (0)
-
-#define ARGOS_LDsl_user(addr, var, tag) \
-    do { \
-        (var) = (int32_t)argos_ldl_user((addr), (tag)); \
-        ARGOS_SAVE_LDl_CONTEXT(addr, var, ARGOS_GUEST_VIRTUAL_ADDR); \
-    } while (0)
-
-#define ARGOS_LDq_user(addr, var, tag) \
-    do { \
-        (var) = argos_ldq_user((addr), (tag)); \
-        ARGOS_SAVE_LDq_CONTEXT(addr, var, ARGOS_GUEST_VIRTUAL_ADDR); \
-    } while (0)
-
-// Store user macros
-#define ARGOS_STb_user(addr, val, tag) \
-    do { \
-        argos_stb_user((addr), (val), (tag)); \
-        ARGOS_SAVE_STb_CONTEXT(addr, val, ARGOS_GUEST_VIRTUAL_ADDR); \
-    } while (0)
-
-#define ARGOS_STw_user(addr, val, tag) \
-    do { \
-        argos_stw_user((addr), (val), (tag)); \
-        ARGOS_SAVE_STw_CONTEXT(addr, val, ARGOS_GUEST_VIRTUAL_ADDR); \
-    } while (0)
-
-#define ARGOS_STl_user(addr, val, tag) \
-    do { \
-        argos_stl_user((addr), (val), (tag)); \
-        ARGOS_SAVE_STl_CONTEXT(addr, val, ARGOS_GUEST_VIRTUAL_ADDR); \
-    } while (0)
-
-#define ARGOS_STq_user(addr, val, tag) \
-    do { \
-        argos_stq_user((addr), (val), (tag)); \
-        ARGOS_SAVE_STq_CONTEXT(addr, val, ARGOS_GUEST_VIRTUAL_ADDR); \
-    } while (0)
-
-#endif
 #endif

@@ -38,6 +38,7 @@
 #include "osdep.h"
 #include "argos-csi.h"
 #include "argos-check.h"
+#include "argos-tracksc.h"
 #include "../exec-all.h"
 
 #define ALERT_TEMPLATE "[ARGOS] Attack detected, code <%s> PC <%x> TARGET <%x>\n"
@@ -79,48 +80,13 @@ void argos_alert(CPUX86State *env, target_ulong new_pc, argos_rtag_t *tag,
         // of csi log files.
         argos_csilog = 0;
 
-//#ifdef ARGOS_NET_TRACKER
         // If we are not tracking shell-code, initialize the shell-code context if tracking
-        // is enabled and if we detect code injection (e.g. we are executing tainted instructions).
-        if (argos_tracksc && !env->shellcode_context.running && code == ARGOS_ALERT_CI)
+        // is enabled and if we detect code injection 
+        // (e.g. we are executing tainted instructions).
+        if (argos_tracksc && !argos_tracksc_is_running(env) && code == ARGOS_ALERT_CI)
         {
-            argos_logf("Starting shell-code tracking...\n");
-            env->shellcode_context.running = 1;
-            env->shellcode_context.cr3 = env->cr[3];
-            if (!env->shellcode_context.logfile)
-            {
-                const unsigned filename_size = 128;
-                char filename[filename_size];
-
-                unsigned id = argos_instance_id;
-
-                snprintf(filename, filename_size,  LOG_SC_FL_TEMPLATE, id);
-                argos_logf("Generated log filename %s.\n", filename);
-                if ((env->shellcode_context.logfile = fopen(filename, "wb")) == NULL) 
-                {
-                    qemu_fprintf(stdout, "Cannot open shellcode log, unable to track shellcode.");
-                    env->shellcode_context.running = 0;
-                }
-                else
-                {
-                    argos_logf("Opened tracking file %s.\n", filename);
-                }
-            }
-
-            // We have successfully initialized the shellcode context,
-            // now put the cpu in single step mode to log the shellcode
-            // instructions.
-            argos_logf("Successfully instanciated shellcode tracking, switching to single step mode.\n");
-            // Enabling single stepping mode allows us to log
-            // the shellcode instructions in the cpu loop.
-            // With single step mode enabled the TB's contain
-            // only one instruction and an exception is thrown
-            // after the execution of this instruction.
-            // During the handling of this exception (EXCP_DEBUG)
-            // we can log the instruction in the current TB.
-            cpu_single_step(env, 1);
+            argos_tracksc_enable(env);
         }
-//#endif
     }
 #if 0
     else if (argos_sctrack && last_alert_cr3 == -1) {

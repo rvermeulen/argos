@@ -25,6 +25,7 @@
 #include "argos-mmxop.h"
 #include "argos-alert.h"
 #include "argos-assert.h"
+#include "argos-tracksc.h"
 
 //#define DEBUG_PCALL
 
@@ -1344,17 +1345,14 @@ void raise_interrupt(int intno, int is_int, int error_code,
         intno = check_exception(intno, &error_code);
     }
 
-#ifdef ARGOS_NET_TRACKER
-	/* 
-	   Windows 2000 uses the interrupt 2E to make system calls.
-	   Newer operating systems however uses the instruction sysenter.
-	*/
-	if ( env->shellcode_context.running && intno == 0x2E)
-	{
-		// Flag that a system call is pending.
-		env->shellcode_context.is_system_call = 1;
-	}
-#endif
+    /* 
+       Windows 2000 uses the interrupt 2E to make system calls.
+       Newer operating systems however uses the instruction sysenter.
+       */
+    if ( argos_tracksc_is_running(env) && intno == 0x2E)
+    {
+        argos_tracksc_log_system_call(env);
+    }
 
     env->exception_index = intno;
     env->error_code = error_code;
@@ -2795,20 +2793,13 @@ void helper_lret_protected(int shift, int addend)
 void helper_sysenter(void)
 {
 
-#ifdef ARGOS_NET_TRACKER
-	/* 
-	   Windows 2000 uses the interrupt 2E to make system calls.
-	   Newer operating systems however uses the instruction sysenter.
-	*/
-	if ( env->shellcode_context.running)
-	{
-		// Flag that a system call is pending.
-		env->shellcode_context.is_system_call = 1;
-		// We want to exit the cpu loop because we want to stop before the instruction
-		// is executed.
-		cpu_loop_exit();
-	}
-#endif
+    if ( argos_tracksc_is_running(env))
+    {
+        if (argos_tracksc_log_system_call(env))
+        {
+            cpu_loop_exit();
+        }
+    }
 
     if (env->sysenter_cs == 0) {
         raise_exception_err(EXCP0D_GPF, 0);
