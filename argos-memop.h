@@ -94,21 +94,6 @@
         ARGOS_SAVE_LDq_CONTEXT(addr, var, ARGOS_HOST_VIRTUAL_ADDR); \
     } while (0)
 
-// Load kernel macros
-#define ARGOS_LDub_kernel(addr, var, tag) ((var) = argos_ldub_kernel((addr), (tag)))
-#define ARGOS_LDsb_kernel(addr, var, tag) ((var) = argos_ldsb_kernel((addr), (tag)))
-#define ARGOS_LDuw_kernel(addr, var, tag) ((var) = argos_lduw_kernel((addr), (tag)))
-#define ARGOS_LDsw_kernel(addr, var, tag) ((var) = argos_ldsw_kernel((addr), (tag)))
-#define ARGOS_LDl_kernel(addr, var, tag)  ((var) = (uint32_t)argos_ldl_kernel((addr), (tag)))
-#define ARGOS_LDsl_kernel(addr, var, tag) ((var) = (int32_t)argos_ldl_kernel((addr), (tag)))
-#define ARGOS_LDq_kernel(addr, var, tag)  ((var) = argos_ldq_kernel((addr), (tag)))
-
-// Store kernel macros
-#define ARGOS_STb_kernel(addr, val, tag) argos_stb_kernel((addr), (val), (tag))
-#define ARGOS_STw_kernel(addr, val, tag) argos_stw_kernel((addr), (val), (tag))
-#define ARGOS_STl_kernel(addr, val, tag) argos_stl_kernel((addr), (val), (tag))
-#define ARGOS_STq_kernel(addr, val, tag) argos_stq_kernel((addr), (val), (tag))
-
 // Store raw macros
 #define ARGOS_STb_raw(addr, val, tag) \
     do { \
@@ -163,7 +148,23 @@
     } while (0)
 
 
+// Load kernel macros
+#define ARGOS_LDub_kernel(addr, var, tag) ((var) = argos_ldub_kernel((addr), (tag)))
+#define ARGOS_LDsb_kernel(addr, var, tag) ((var) = argos_ldsb_kernel((addr), (tag)))
+#define ARGOS_LDuw_kernel(addr, var, tag) ((var) = argos_lduw_kernel((addr), (tag)))
+#define ARGOS_LDsw_kernel(addr, var, tag) ((var) = argos_ldsw_kernel((addr), (tag)))
+#define ARGOS_LDl_kernel(addr, var, tag)  ((var) = (uint32_t)argos_ldl_kernel((addr), (tag)))
+#define ARGOS_LDsl_kernel(addr, var, tag) ((var) = (int32_t)argos_ldl_kernel((addr), (tag)))
+#define ARGOS_LDq_kernel(addr, var, tag)  ((var) = argos_ldq_kernel((addr), (tag)))
+
+// Store kernel macros
+#define ARGOS_STb_kernel(addr, val, tag) argos_stb_kernel((addr), (val), (tag))
+#define ARGOS_STw_kernel(addr, val, tag) argos_stw_kernel((addr), (val), (tag))
+#define ARGOS_STl_kernel(addr, val, tag) argos_stl_kernel((addr), (val), (tag))
+#define ARGOS_STq_kernel(addr, val, tag) argos_stq_kernel((addr), (val), (tag))
+
 // Load user macros
+// The load addresses are resolved in the softmmu (see softmmu_template.h)
 #define ARGOS_LDub_user(addr, var, tag) \
     do { \
         (var) = argos_ldub_user((addr), (tag)); \
@@ -214,6 +215,7 @@
     } while (0)
 
 // Store user macros
+// The store addresses are resolved in the softmmu (see softmmu_template.h)
 #define ARGOS_STb_user(addr, val, tag) \
     do { \
         argos_stb_user((addr), (val), (tag)); \
