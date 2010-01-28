@@ -81,8 +81,7 @@ int argos_tracksc_log_system_call(CPUX86State * env);
 // The phys_ram_base is stripped by the ARGOS_OFFSET(X) macro,
 // so it must be added to the returned offset.
 #ifdef ARGOS_NET_TRACKER
-    //#define ARGOS_NETIDXPTR(X) ( argos_memmap_ntdata(ARGOS_OFFSET((X))) )
-    #define ARGOS_NETIDXPTR(X) (0)
+    #define ARGOS_NETIDXPTR(X) ( argos_memmap_ntdata(ARGOS_OFFSET((X))) )
 #else
     #define ARGOS_NETIDXPTR(X) (0)
 #endif
