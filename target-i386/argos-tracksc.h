@@ -29,79 +29,17 @@
  OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ARGOS_SHELLCODE_H
-#define ARGOS_SHELLCODE_H
-
-#define LOG_SC_FL_TEMPLATE "argos.sc.%d"
-
-#define MAX_INSTRUCTION_CNT 100
-#define MAX_INSTRUCTION_SIZE 17
-#define MAX_ADDRESSABLE_BYTES 8
-
-// Shellcode stop conditions
-#define SSC_MAX_INSTR_CNT       0
-#define SSC_FIRST_SYSTEM_CALL   1
-// Memory address types
-#define ARGOS_GUEST_VIRTUAL_ADDR    0
-#define ARGOS_GUEST_PHYSICAL_ADDR   1
-#define ARGOS_HOST_VIRTUAL_ADDR     2
-// The argos shellcode context contains the context that is needed to
-// to track the execution of shellcode and the bytes referenced by
-// the shellcode instructions.
-
-typedef struct argos_shellcode_context_s
-{
-    // Is there an instance of shellcode running.
-    unsigned running;
-    unsigned stop_condition;
-    // The value of the cr3 register at the moment code injection is detected.
-    // We use this to determine if the execution of tainted bytes belong to the
-    // process of which we are tracking the execution of shellcode.
-    target_ulong cr3;
-    // The following file pointer is used for internal debugging reasons.
-    FILE* logfile;
-    // The number of shell-code instructions executed.
-    unsigned instruction_cnt;
-    // Is the instruction pointed to by the eip a system call.
-    unsigned is_system_call;
-    // We use the current eip to check if memory references are related/performed
-    // to the instruction we are now logging, since we want to log those references.
-    target_ulong loadedby_eip;
-    target_ulong storedby_eip;
-    target_ulong executed_eip;
-    // Buffer containing the executed bytes
-    char instruction[MAX_INSTRUCTION_SIZE];
-    // Size of the instruction
-    unsigned short instruction_size;
-    // Did we logged something.
-    unsigned logged;
-#ifdef ARGOS_NET_TRACKER
-    // The stage of the instruction being executed.
-    unsigned instruction_stage;
-    // The highest stage in the current execution of shell-code.
-    unsigned trace_stage;
-    // corresponding raw net id.
-    argos_netidx_t instruction_netidx[MAX_INSTRUCTION_SIZE];
-    // Sometimes we retrieve the netidx before logging, so we cache it here
-    argos_netidx_t * load_value_netidx;
-    // Sometimes we retrieve the netidx before logging, so we cache it here
-    argos_netidx_t * store_value_netidx;
-#endif
-    // Bytes loaded by the instruction
-    target_ulong load_value;
-    // Address of the bytes loaded by the instruction
-    unsigned long load_addr;
-    unsigned char load_addr_type;
-    // Number of loaded bytes
-    unsigned load_size;
-    // Bytes stored by the instruction
-    target_ulong store_value;
-    // Address of the bytes loaded by the instruction
-    unsigned long store_addr;
-    unsigned char store_addr_type;
-    // Number of stored bytes
-    unsigned store_size;
-} argos_shellcode_context_t;
+#ifndef ARGOS_TRACKSC_H
+#define ARGOS_TRACKSC_H
+void argos_tracksc_init(CPUX86State * env);
+void argos_tracksc_stop(CPUX86State * env);
+int argos_tracksc_is_running(CPUX86State * env);
+void argos_tracksc_enable(CPUX86State * env);
+void argos_tracksc_store_context(CPUX86State * env);
+void argos_tracksc_log_instruction(CPUX86State * env);
+void argos_tracksc_check_for_system_call(CPUX86State * env);
+int argos_tracksc_logged_system_call(CPUX86State * env);
+int argos_tracksc_log_system_call(CPUX86State * env);
 
 // The following macro's are used to store the load and store context.
 #define ARGOS_SAVE_LD_CONTEXT(addr, var, type, size) \
@@ -138,10 +76,15 @@ typedef struct argos_shellcode_context_s
 #define ARGOS_SAVE_STl_CONTEXT(addr, val, type) ARGOS_SAVE_ST_CONTEXT(addr, val, type, 4)
 #define ARGOS_SAVE_STq_CONTEXT(addr, val, type) ARGOS_SAVE_ST_CONTEXT(addr, val, type, 8)
 
-// X should be retrieved by the expression get_phys_addr_code(env, addr) + (unsigned long)phys_ram_base
-// The phys_ram_base is stripped by the ARGOS_OFFSET(X) macro, so it must be added to the returned offset.
+// X should be retrieved by the expression get_phys_addr_code(env, addr) +
+// (unsigned long)phys_ram_base
+// The phys_ram_base is stripped by the ARGOS_OFFSET(X) macro,
+// so it must be added to the returned offset.
 #ifdef ARGOS_NET_TRACKER
-    #define ARGOS_NETIDXPTR(X) ( argos_memmap_ntdata(ARGOS_OFFSET((X))) )
+    //#define ARGOS_NETIDXPTR(X) ( argos_memmap_ntdata(ARGOS_OFFSET((X))) )
+    #define ARGOS_NETIDXPTR(X) (0)
+#else
+    #define ARGOS_NETIDXPTR(X) (0)
 #endif
 
 #endif
