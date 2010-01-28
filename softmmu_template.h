@@ -123,6 +123,10 @@ DATA_TYPE REGPARM(1) glue(glue(__ld, SUFFIX), MMUSUFFIX)(target_ulong addr,
     tlb_addr = env->tlb_table[mmu_idx][index].ADDR_READ;
     if ((addr & TARGET_PAGE_MASK) == (tlb_addr & (TARGET_PAGE_MASK | TLB_INVALID_MASK))) {
         physaddr = addr + env->tlb_table[mmu_idx][index].addend;
+#ifdef ARGOS_SOFTMMU
+        env->shellcode_context.load_addr = physaddr;
+        env->shellcode_context.load_addr_type = ARGOS_HOST_VIRTUAL_ADDR;
+#endif
         if (tlb_addr & ~TARGET_PAGE_MASK) {
             /* IO access */
             if ((addr & (DATA_SIZE - 1)) != 0)
@@ -334,6 +338,10 @@ void REGPARM(2) glue(glue(__st, SUFFIX), MMUSUFFIX)(target_ulong addr,
     tlb_addr = env->tlb_table[mmu_idx][index].addr_write;
     if ((addr & TARGET_PAGE_MASK) == (tlb_addr & (TARGET_PAGE_MASK | TLB_INVALID_MASK))) {
         physaddr = addr + env->tlb_table[mmu_idx][index].addend;
+#ifdef ARGOS_SOFTMMU
+        env->shellcode_context.store_addr = physaddr;
+        env->shellcode_context.store_addr_type = ARGOS_HOST_VIRTUAL_ADDR;
+#endif
         if (tlb_addr & ~TARGET_PAGE_MASK) {
             /* IO access */
             if ((addr & (DATA_SIZE - 1)) != 0)
