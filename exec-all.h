@@ -545,7 +545,7 @@ static inline target_ulong get_phys_addr_code(CPUState *env, target_ulong addr)
 /* NOTE: this function can trigger an exception */
 /* NOTE2: the returned address is not exactly the physical address: it
    is the offset relative to phys_ram_base */
-static /*inline*/ target_ulong get_phys_addr_code(CPUState *env, target_ulong addr)
+static inline target_ulong get_phys_addr_code(CPUState *env, target_ulong addr)
 {
     int mmu_idx, index, pd;
 
