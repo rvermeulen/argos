@@ -387,7 +387,7 @@ typedef struct _IMAGE_EXPORT_DIRECTORY {
     DWORD Base;
     DWORD NumberOfFunctions;
     DWORD NumberOfNames;
-    DWORD AdressOfFunctions;
+    DWORD AddressOfFunctions;
     DWORD AddressOfNames;
     DWORD AddressOfNameOrdinals;
 } IMAGE_EXPORT_DIRECTORY, *PIMAGE_EXPORT_DIRECTORY  __attribute__((aligned (4)));
