@@ -12,6 +12,23 @@
 #include "win2k/winternl.h"
 #include "argos-tracksc.h"
 
+target_phys_addr_t get_phys_addr(CPUX86State *env, target_ulong addr)
+{
+    target_phys_addr_t paddr;
+
+    paddr = cpu_get_phys_page_debug(env, addr + env->segs[R_CS].base);
+    if (paddr == -1)
+    {
+        return 0;
+    }
+    else
+    {
+        return ((paddr & TARGET_PAGE_MASK) | (addr & ~TARGET_PAGE_MASK));
+    }
+}
+
+
+#define PHYS_ADDR(X) (get_phys_addr(env, (target_ulong)(X)) + (unsigned long) phys_ram_base)
 
 static INSTRUCTION current_instr;
 // The pc must be a host virtual address.
@@ -19,7 +36,14 @@ static int argos_tracksc_instr_len(unsigned long pc);
 static void argos_tracksc_dump_current_instr(argos_shellcode_context_t * context);
 static void argos_tracksc_dump_loaded_modules(CPUX86State * env);
 
-#define PHYS_ADDR(X) (get_phys_addr_code(env, (target_ulong)(X)) + (unsigned long) phys_ram_base)
+typedef struct _function_entry
+{
+    struct _function_entry * next;
+    char * module_name;
+    char * function_name;
+    target_ulong ordinal;
+    target_ulong addr;
+} function_entry;
 
 int argos_tracksc_instr_len(unsigned long pc)
 {
@@ -80,12 +104,14 @@ int argos_tracksc_is_running(CPUX86State * env)
 
 void argos_tracksc_enable(CPUX86State * env)
 {
+    argos_logf("Starting shell-code tracking...\n");
+
     argos_logf("Dumping loaded modules for targeted process.\n");
     argos_tracksc_dump_loaded_modules(env);
+    argos_logf("Done dumping loaded modules for targeted process.\n");
 
-    argos_logf("Starting shell-code tracking...\n");
-    env->shellcode_context.running = 1;
     env->shellcode_context.cr3 = env->cr[3];
+    env->shellcode_context.running = 1;
 
     // We have successfully initialized the shellcode context,
     // now put the cpu in single step mode to log the shellcode
@@ -423,7 +449,7 @@ int argos_tracksc_logged_system_call(CPUX86State * env)
 static void argos_tracksc_dump_loaded_modules(CPUX86State * env)
 {
     target_ulong gv_fs = 0;
-    unsigned long hp_fs = 0;
+    target_phys_addr_t hp_fs = 0;
     PTEB teb = 0;
     PPEB peb = 0;
     PPEB_LDR_DATA ldr_data = 0;
@@ -435,24 +461,46 @@ static void argos_tracksc_dump_loaded_modules(CPUX86State * env)
     // fs:[0x0] contains the Thread Execution Block.
     gv_fs = env->segs[R_FS].base;
     hp_fs = PHYS_ADDR(gv_fs);
+    if ( hp_fs == 0 )
+    {
+        argos_logf("Failed to obtain physical address of teb.\n");
+        return;
+    }
 
-    argos_logf("fs:[0x0] = 0x%x  @ 0x%lx\n", gv_fs, hp_fs);
+    //argos_logf("fs:[0x0] = 0x%x  @ 0x%lx\n", gv_fs, hp_fs);
 
     teb = (PTEB)hp_fs;
     argos_logf("peb = 0x%x\n", teb->Peb);
     peb = (PPEB)PHYS_ADDR(teb->Peb);
-    argos_logf("peb @ 0x%lx\n", peb);
+    if ( peb == 0 )
+    {
+        argos_logf("Failed to obtain physical address of peb.\n");
+        return;
+    }
 
-    argos_logf("peb->LoaderData = 0x%x", peb->LoaderData);
+    //argos_logf("peb @ 0x%lx\n", peb);
+
+    //argos_logf("peb->LoaderData = 0x%x", peb->LoaderData);
     ldr_data = (PPEB_LDR_DATA) PHYS_ADDR(peb->LoaderData);
-    argos_logf("peb->LoaderData @ 0x%lx", ldr_data);
+    if ( ldr_data == 0 )
+    {
+        argos_logf("Failed to obtain physical address of loader data.\n");
+        return;
+    }
+
+    //argos_logf("peb->LoaderData @ 0x%lx", ldr_data);
 
     module_list = ldr_data->InLoadOrderModuleList;
-    argos_logf("peb->LoaderData->InLoadOrderModuleList.Flink = 0x%x\n",
-            module_list.Flink);
+    //argos_logf("peb->LoaderData->InLoadOrderModuleList.Flink = 0x%x\n",
+    //        module_list.Flink);
     forward_iterator = (PLIST_ENTRY) PHYS_ADDR(module_list.Flink);
-    argos_logf("Forward entry = 0x%x @ 0x%lx\n", module_list.Flink,
-            forward_iterator);
+    if ( forward_iterator == 0 )
+    {
+        argos_logf("Failed to obtain physical address of Flink.\n");
+        return;
+    }
+    //argos_logf("Forward entry = 0x%x @ 0x%lx\n", module_list.Flink,
+    //        forward_iterator);
 
     module_table = (PLDR_DATA_TABLE_ENTRY)forward_iterator;
     while ( module_table != 0 )
@@ -461,16 +509,26 @@ static void argos_tracksc_dump_loaded_modules(CPUX86State * env)
         if ( !first_module )
         {
             PIMAGE_DOS_HEADER dos_hdr = (PIMAGE_DOS_HEADER) PHYS_ADDR(module_table->BaseAddress);
+            if ( dos_hdr == 0 )
+            {
+                argos_logf("Failed to obtain physical address of dos header.\n");
+                return;
+            }
 
             if ( dos_hdr->e_magic == IMAGE_DOS_SIGNATURE  )
             {
                 PIMAGE_NT_HEADERS pe_hdr =
                     (PIMAGE_NT_HEADERS)PHYS_ADDR(module_table->BaseAddress + dos_hdr->e_lfanew);
+                if ( pe_hdr == 0 )
+                {
+                    argos_logf("Failed to obtain physical address of pe header.\n");
+                    return;
+                }
 
                 if ( pe_hdr->Signature == IMAGE_PE_SIGNATURE )
                 {
                     PIMAGE_DATA_DIRECTORY export_data_dir = 0;
-                    argos_logf("Found valid pe signature!\n");
+                    //argos_logf("Found valid pe signature!\n");
 
                     if ( pe_hdr->OptionalHeader.NumberOfRvaAndSizes > 0 )
                     {
@@ -481,10 +539,54 @@ static void argos_tracksc_dump_loaded_modules(CPUX86State * env)
                                 (PIMAGE_EXPORT_DIRECTORY)
                                 PHYS_ADDR(module_table->BaseAddress +
                                         export_data_dir->VirtualAddress);
+                            if ( export_dir == 0 )
+                            {
+                                argos_logf("Failed to obtain physical address of export directory.\n");
+                                return;
+                            }
+
+                            target_ulong addresses = module_table->BaseAddress + export_dir->AddressOfFunctions;
+
+                            target_ulong names = module_table->BaseAddress + export_dir->AddressOfNames;
+
+                            target_ulong nameOrdinals = module_table->BaseAddress + export_dir->AddressOfNameOrdinals;
+
+                            unsigned i;
 
                             char * name = (char*)PHYS_ADDR(module_table->BaseAddress + 
                                     export_dir->Name);
+                            if ( name == 0 )
+                            {
+                                argos_logf("Failed to obtain physical address of module name.\n");
+                                return;
+                            }
+
                             printf("Found module %s\n", name);
+                            /*for (i = 0; i < export_dir->NumberOfFunctions; i++)
+                            {
+                                char * function_name = 0;
+                                if ( i < export_dir->NumberOfNames)
+                                {
+                                    DWORD function_name_rva = *(DWORD*)PHYS_ADDR( names + i * sizeof(DWORD) );
+                                    function_name =
+                                        (char*)PHYS_ADDR(module_table->BaseAddress +
+                                                function_name_rva);
+                                    //printf("%s\n", function_name);
+
+                                }
+                                WORD ordinal_offset = nameOrdinals[i];
+                                DWORD gv_address = module_table->BaseAddress +
+                                    addresses[ordinal_offset - export_dir->Base];
+                                unsigned long hp_address = PHYS_ADDR(gv_address);
+
+                                if ( function_name )
+                                {
+                                    printf("%s ", function_name);
+                                }
+                                printf(" %i @ 0x%x\n", 
+                                        ordinal_offset + export_dir->Base,
+                                        gv_address);
+                            }*/
                         }
                         else
                         {
@@ -492,15 +594,15 @@ static void argos_tracksc_dump_loaded_modules(CPUX86State * env)
                         }
                     }
                 }
-                else
-                {
-                    argos_logf("Found invalid pe signature!\n");
-                }
+                //else
+                //{
+                //    argos_logf("Found invalid pe signature!\n");
+                //}
             }
-            else
-            {
-                argos_logf("Found invalid dos signature!\n");
-            }
+            //else
+            //{
+            //    argos_logf("Found invalid dos signature!\n");
+            //}
         }
         else
         {
