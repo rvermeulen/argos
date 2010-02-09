@@ -3,7 +3,9 @@
 
 #include <stdint.h>
 
-typedef uint32_t PTR;
+// We define a target pointer types since the guest width may differ
+// with the host width (e.g. 32 bit guest on 64 bit host).
+typedef uint32_t target_ptr_t;
 
 //typedef unsigned char BYTE;
 typedef int16_t SHORT;
@@ -21,13 +23,13 @@ typedef WCHAR* PWSTR;
 typedef uint8_t BOOLEAN;
 typedef void VOID;
 //typedef VOID* PVOID;
-typedef PTR PVOID;
+typedef target_ptr_t PVOID;
 //typedef PVOID* PPVOID;
-typedef PTR PPVOID;
+typedef target_ptr_t PPVOID;
 typedef LONG HANDLE;
 typedef LONG NTSTATUS;
 //typedef void* PPS_POST_PROCESS_INIT_ROUTINE;
-typedef PTR PPS_POST_PROCESS_INIT_ROUTINE;
+typedef target_ptr_t PPS_POST_PROCESS_INIT_ROUTINE;
 typedef void (*PPEBLOCKROUTINE)(PVOID PebLock); 
 
 typedef union _LARGE_INTEGER {
