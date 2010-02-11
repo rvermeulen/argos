@@ -87,26 +87,6 @@ void argos_alert(CPUX86State *env, target_ulong new_pc, argos_rtag_t *tag,
         {
             argos_tracksc_enable(env);
         }
-        else if ( argos_tracksc && argos_tracksc_is_running(env) && code == ARGOS_ALERT_CALL )
-        {
-            if (  env->shellcode_context.imported_functions )
-            {
-                argos_tracksc_imported_function * cursor =
-                    env->shellcode_context.imported_functions;
-                while ( cursor != NULL )
-                {
-                    if ( cursor->address == env->eip )
-                    {
-                        argos_tracksc_log_imported_function_call(env, cursor);
-                        break;
-                    }
-                    else
-                    {
-                        cursor = cursor->next;
-                    }
-                }
-            }
-        }
     }
 #if 0
     else if (argos_sctrack && last_alert_cr3 == -1) {
