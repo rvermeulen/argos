@@ -692,11 +692,41 @@ next:
     }
 }
 
-void argos_tracksc_log_imported_function_call( CPUX86State * env,
-        argos_tracksc_imported_function * function)
+void argos_tracksc_check_function_call( CPUX86State * env)
 {
-    if ( function->function )
+    if ( env->shellcode_context.running && env->cr[3] == env->shellcode_context.cr3 )
     {
-        argos_logf("Shellcode called the function %s\n", function->function);
+        if ( !argos_dest_pc_isdirty(env, env->eip))
+        {
+            if (  env->shellcode_context.imported_functions )
+            {
+                argos_tracksc_imported_function * cursor =
+                    env->shellcode_context.imported_functions;
+                while ( cursor != NULL )
+                {
+                    if ( cursor->address == env->eip )
+                    {
+                        if (cursor->function)
+                        {
+                            argos_logf("Called imported function %s\n", cursor->function);
+                        }
+                        break;
+                    }
+                    else
+                    {
+                        cursor = cursor->next;
+                    }
+                }
+
+                if ( cursor == NULL )
+                {
+                    argos_logf("Called unknown function at 0x%x\n", env->eip);
+                }
+            }
+        }
+        else
+        {
+            argos_logf("Called injected function.\n");
+        }
     }
 }
