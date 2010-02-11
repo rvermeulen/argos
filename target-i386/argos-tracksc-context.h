@@ -47,7 +47,16 @@
 // to track the execution of shellcode and the bytes referenced by
 // the shellcode instructions.
 
-typedef struct argos_shellcode_context_s
+typedef struct _argos_tracksc_imported_function
+{
+    struct _argos_tracksc_imported_function * next;
+    char * module;
+    char * function;
+    target_ulong ordinal;
+    target_ulong address;
+} argos_tracksc_imported_function;
+
+typedef struct _argos_tracksc_context
 {
     // Is there an instance of shellcode running.
     unsigned running;
@@ -61,7 +70,7 @@ typedef struct argos_shellcode_context_s
     // The number of shell-code instructions executed.
     unsigned instruction_cnt;
     // Is the instruction pointed to by the eip a system call.
-    unsigned is_system_call;
+    char is_system_call;
     // We use the current eip to check if memory references are related/performed
     // to the instruction we are now logging, since we want to log those references.
     target_ulong loadedby_eip;
@@ -99,5 +108,6 @@ typedef struct argos_shellcode_context_s
     unsigned char store_addr_type;
     // Number of stored bytes
     unsigned store_size;
+    argos_tracksc_imported_function * imported_functions;
 } argos_shellcode_context_t;
 #endif
