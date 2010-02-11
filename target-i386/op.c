@@ -27,6 +27,7 @@
 #include "argos-mmxop.h"
 #include "argos-debug.h"
 #include "argos-alert.h"
+#include "argos-tracksc.h"
 
 /* n must be a constant to be efficient */
 static inline target_long lshift(target_long x, int n)
@@ -734,6 +735,7 @@ void OPPROTO op_argos_call_jmp_T0(void)
     EIP = T0;
     //ARGOS_CHECK(T0TAG, old_pc, ARGOS_ALERT_CALL);
     ARGOS_CI_CHECK(T0TAG, old_pc, ARGOS_ALERT_CALL);
+    argos_tracksc_check_function_call(env);
 }
 
 void OPPROTO op_argos_ret_jmp_T0(void)
