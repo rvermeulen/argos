@@ -40,8 +40,7 @@ void argos_tracksc_log_instruction(CPUX86State * env);
 void argos_tracksc_check_for_system_call(CPUX86State * env);
 int argos_tracksc_logged_system_call(CPUX86State * env);
 int argos_tracksc_log_system_call(CPUX86State * env);
-void argos_tracksc_log_imported_function_call( CPUX86State * env,
-        argos_tracksc_imported_function * function);
+void argos_tracksc_check_function_call( CPUX86State * env);
 
 // The following macro's are used to store the load and store context.
 #define ARGOS_SAVE_LD_CONTEXT(addr, var, type, size) \
