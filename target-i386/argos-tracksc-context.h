@@ -65,6 +65,7 @@ typedef struct _argos_tracksc_context
     // We use this to determine if the execution of tainted bytes belong to the
     // process of which we are tracking the execution of shellcode.
     target_ulong cr3;
+    target_ulong thread_id;
     // The following file pointer is used for internal debugging reasons.
     FILE* logfile;
     // The number of shell-code instructions executed.
