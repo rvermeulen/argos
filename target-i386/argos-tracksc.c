@@ -707,6 +707,10 @@ void argos_tracksc_check_function_call( CPUX86State * env)
             if (  env->shellcode_context.imported_functions )
             {
                 // Filter calls done in kernel-mode.
+                // TODO: Have to check for runtime flags /3GB and
+                // /USERVA, because they allow for a greater private
+                // addressing space at the expense of a smaller kernel 
+                // addressing space.
                 if ( env->eip < 0x80000000 )
                 {
                     argos_tracksc_imported_function * cursor =
