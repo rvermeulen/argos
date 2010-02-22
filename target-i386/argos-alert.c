@@ -59,7 +59,7 @@ void argos_alert(CPUX86State *env, target_ulong new_pc, argos_rtag_t *tag,
     if (!argos_tag_isdirty(tag))
         code = ARGOS_ALERT_CI;
 
-    if ( !env->shellcode_context.running )
+    if ( argos_tracksc_is_active(env) )
     {
         argos_logf(ALERT_TEMPLATE, adesc[code], old_pc, new_pc);
     }
@@ -73,20 +73,35 @@ void argos_alert(CPUX86State *env, target_ulong new_pc, argos_rtag_t *tag,
     {
         argos_forensics(env, rid);
     }
-    else
+    else if (argos_tracksc)
     {
-        // When shell-code tracking is enabled, Argos is going to generate multiple
-        // alerts. We however want only one log csi log file so we disable the generation
+        // When shell-code tracking is enabled, 
+        // Argos is going to generate multiple alerts.
+        // We however want only one log csi log file so we disable the generation
         // of csi log files.
         argos_csilog = 0;
 
-        // If we are not tracking shell-code, initialize the shell-code context if tracking
+        // If we are not tracking shell-code, 
+        // initialize the shell-code context if tracking
         // is enabled and if we detect code injection 
         // (e.g. we are executing tainted instructions).
-        if (argos_tracksc && !argos_tracksc_is_running(env) && code == ARGOS_ALERT_CI)
+        switch ( code )
         {
-            argos_tracksc_enable(env);
-        }
+            case ARGOS_ALERT_CI:
+                {
+                    argos_logf("Detected code injection.\n");
+                    argos_tracksc_enable(env);
+                }
+            case ARGOS_ALERT_RET:
+                {
+                    argos_logf("Detected overwritten return.\n");
+                }
+            default:
+                {
+                    argos_logf("Detected unhandled Argos alert %i.\n",
+                            code);
+                }
+        };
     }
 #if 0
     else if (argos_sctrack && last_alert_cr3 == -1) {
