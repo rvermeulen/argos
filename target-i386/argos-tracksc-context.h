@@ -43,9 +43,11 @@
 #define ARGOS_GUEST_VIRTUAL_ADDR    0
 #define ARGOS_GUEST_PHYSICAL_ADDR   1
 #define ARGOS_HOST_VIRTUAL_ADDR     2
-// The argos shellcode context contains the context that is needed to
-// to track the execution of shellcode and the bytes referenced by
-// the shellcode instructions.
+
+// Instance status types
+#define ARGOS_TRACKSC_PHASE_IDLE       0x1
+#define ARGOS_TRACKSC_PHASE_ANALYZING  0x2
+#define ARGOS_TRACKSC_PHASE_TRACKING   0x3
 
 typedef struct _argos_tracksc_imported_function
 {
@@ -56,10 +58,19 @@ typedef struct _argos_tracksc_imported_function
     target_ulong address;
 } argos_tracksc_imported_function;
 
+typedef struct _argos_tracksc_analysis_context
+{
+    argos_tracksc_imported_function * last_inserted_import;
+    unsigned current_module_idx;
+    unsigned current_import_idx;
+} argos_tracksc_analysis_context;
+// The argos shellcode context contains the context that is needed to
+// to track the execution of shellcode and the bytes referenced by
+// the shellcode instructions.
 typedef struct _argos_tracksc_context
 {
     // Is there an instance of shellcode running.
-    unsigned running;
+    unsigned phase;
     unsigned stop_condition;
     // The value of the cr3 register at the moment code injection is detected.
     // We use this to determine if the execution of tainted bytes belong to the
@@ -110,5 +121,6 @@ typedef struct _argos_tracksc_context
     // Number of stored bytes
     unsigned store_size;
     argos_tracksc_imported_function * imported_functions;
+    argos_tracksc_analysis_context analysis_context;
 } argos_shellcode_context_t;
 #endif
