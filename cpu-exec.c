@@ -700,10 +700,7 @@ int cpu_exec(CPUState *env1)
                 fp.gp = code_gen_buffer + 2 * (1 << 20);
                 (*(void (*)(void)) &fp)();
 #else
-                if ( argos_tracksc_is_running(env) )
-                {
-                    argos_tracksc_store_context(env);
-                }
+                argos_tracksc_store_context(env);
                 gen_func();
 #endif
                 env->current_tb = NULL;
@@ -730,13 +727,11 @@ int cpu_exec(CPUState *env1)
         {
             env_to_regs();
 
-            if ( argos_tracksc_is_running(env) )
+            /* Take care of the int 2E or sysenter system call before it is
+             * called */
+            if ( argos_tracksc_logged_invalid_system_call(env) )
             {
-                /* Take care of the int 2E or sysenter system call before it is called */
-                if ( argos_tracksc_logged_system_call(env) )
-                {
-                    break;
-                }
+                break;
             }
         }
     } /* for(;;) */
