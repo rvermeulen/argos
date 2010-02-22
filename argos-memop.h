@@ -102,7 +102,7 @@
         stb_raw((addr), val); \
         ARGOS_MEMMAP_STb((addr), (tag));\
         ARGOS_SAVE_STb_CONTEXT(addr, val, ARGOS_HOST_VIRTUAL_ADDR); \
-        if ( netidx && env->shellcode_context.running ) \
+        if ( netidx && ARGOS_TRACKSC_IS_TRACKING ) \
         { \
             ARGOS_SET_STAGE( *netidx, env->shellcode_context.instruction_stage  ); \
             ARGOS_INCREMENT_STAGE( *netidx ); \
@@ -115,7 +115,7 @@
         stw_raw((addr), val); \
         ARGOS_MEMMAP_STw((addr), (tag)); \
         ARGOS_SAVE_STw_CONTEXT(addr, val, ARGOS_HOST_VIRTUAL_ADDR); \
-        if ( netidx && env->shellcode_context.running ) \
+        if ( netidx && ARGOS_TRACKSC_IS_TRACKING ) \
         { \
             ARGOS_SET_STAGE( *netidx, env->shellcode_context.instruction_stage  ); \
             ARGOS_INCREMENT_STAGE( *netidx ); \
@@ -128,7 +128,7 @@
         stl_raw((addr), val); \
         ARGOS_MEMMAP_STl((addr), (tag)); \
         ARGOS_SAVE_STl_CONTEXT(addr, val, ARGOS_HOST_VIRTUAL_ADDR); \
-        if ( netidx && env->shellcode_context.running ) \
+        if ( netidx && ARGOS_TRACKSC_IS_TRACKING ) \
         { \
             ARGOS_SET_STAGE( *netidx, env->shellcode_context.instruction_stage  ); \
             ARGOS_INCREMENT_STAGE( *netidx ); \
@@ -141,7 +141,7 @@
         stq_raw((addr), val); \
         ARGOS_MEMMAP_STq((addr), (tag));\
         ARGOS_SAVE_STq_CONTEXT(addr, val, ARGOS_HOST_VIRTUAL_ADDR); \
-        if ( netidx && env->shellcode_context.running ) \
+        if ( netidx && ARGOS_TRACKSC_IS_TRACKING ) \
         { \
             ARGOS_SET_STAGE( *netidx, env->shellcode_context.instruction_stage  ); \
             ARGOS_INCREMENT_STAGE( *netidx ); \
@@ -251,7 +251,7 @@
         argos_stb_user((addr), (val), (tag)); \
         env->shellcode_context.store_value_netidx = ARGOS_NETIDXPTR(env->shellcode_context.store_addr); \
         ARGOS_SAVE_STb_CONTEXT(addr, val, ARGOS_GUEST_VIRTUAL_ADDR); \
-        if ( env->shellcode_context.store_value_netidx && env->shellcode_context.running ) \
+        if ( env->shellcode_context.store_value_netidx && ARGOS_TRACKSC_IS_TRACKING ) \
         { \
             ARGOS_SET_STAGE( *env->shellcode_context.store_value_netidx, env->shellcode_context.instruction_stage  ); \
             ARGOS_INCREMENT_STAGE( *env->shellcode_context.store_value_netidx ); \
@@ -263,7 +263,7 @@
         argos_stw_user((addr), (val), (tag)); \
         env->shellcode_context.store_value_netidx = ARGOS_NETIDXPTR(env->shellcode_context.store_addr); \
         ARGOS_SAVE_STw_CONTEXT(addr, val, ARGOS_GUEST_VIRTUAL_ADDR); \
-        if ( env->shellcode_context.store_value_netidx && env->shellcode_context.running ) \
+        if ( env->shellcode_context.store_value_netidx && ARGOS_TRACKSC_IS_TRACKING ) \
         { \
             ARGOS_SET_STAGE( *env->shellcode_context.store_value_netidx, env->shellcode_context.instruction_stage  ); \
             ARGOS_INCREMENT_STAGE( *env->shellcode_context.store_value_netidx ); \
@@ -275,7 +275,7 @@
         argos_stl_user((addr), (val), (tag)); \
         env->shellcode_context.store_value_netidx = ARGOS_NETIDXPTR(env->shellcode_context.store_addr); \
         ARGOS_SAVE_STl_CONTEXT(addr, val, ARGOS_GUEST_VIRTUAL_ADDR); \
-        if ( env->shellcode_context.store_value_netidx && env->shellcode_context.running ) \
+        if ( env->shellcode_context.store_value_netidx && ARGOS_TRACKSC_IS_TRACKING ) \
         { \
             ARGOS_SET_STAGE( *env->shellcode_context.store_value_netidx, env->shellcode_context.instruction_stage  ); \
             ARGOS_INCREMENT_STAGE( *env->shellcode_context.store_value_netidx ); \
@@ -287,7 +287,7 @@
         argos_stq_user((addr), (val), (tag)); \
         env->shellcode_context.store_value_netidx = ARGOS_NETIDXPTR(env->shellcode_context.store_addr); \
         ARGOS_SAVE_STq_CONTEXT(addr, val, ARGOS_GUEST_VIRTUAL_ADDR); \
-        if ( env->shellcode_context.store_value_netidx && env->shellcode_context.running ) \
+        if ( env->shellcode_context.store_value_netidx && ARGOS_TRACKSC_IS_TRACKING ) \
         { \
             ARGOS_SET_STAGE( *env->shellcode_context.store_value_netidx, env->shellcode_context.instruction_stage  ); \
             ARGOS_INCREMENT_STAGE( *env->shellcode_context.store_value_netidx ); \
