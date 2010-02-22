@@ -33,19 +33,22 @@
 #define ARGOS_TRACKSC_H
 void argos_tracksc_init(CPUX86State * env);
 void argos_tracksc_stop(CPUX86State * env);
-int argos_tracksc_is_running(CPUX86State * env);
 void argos_tracksc_enable(CPUX86State * env);
 void argos_tracksc_store_context(CPUX86State * env);
-void argos_tracksc_log_instruction(CPUX86State * env);
-void argos_tracksc_check_for_system_call(CPUX86State * env);
-int argos_tracksc_logged_system_call(CPUX86State * env);
-int argos_tracksc_log_system_call(CPUX86State * env);
+int argos_tracksc_log_instruction(CPUX86State * env);
+void argos_tracksc_check_for_invalid_system_call(CPUX86State * env);
+int argos_tracksc_logged_invalid_system_call(CPUX86State * env);
+int argos_tracksc_is_valid_system_call(CPUX86State * env);
 void argos_tracksc_check_function_call( CPUX86State * env);
+unsigned char argos_tracksc_is_active( CPUX86State * env);
+
+#define ARGOS_TRACKSC_IS_TRACKING env->shellcode_context.phase \
+    == ARGOS_TRACKSC_PHASE_TRACKING
 
 // The following macro's are used to store the load and store context.
 #define ARGOS_SAVE_LD_CONTEXT(addr, var, type, size) \
     do { \
-        if ( env->shellcode_context.running ) \
+        if ( ARGOS_TRACKSC_IS_TRACKING ) \
         { \
             env->shellcode_context.loadedby_eip = env->eip; \
             env->shellcode_context.load_value = (var); \
@@ -62,7 +65,7 @@ void argos_tracksc_check_function_call( CPUX86State * env);
 
 #define ARGOS_SAVE_ST_CONTEXT(addr, val, type, size) \
     do { \
-        if ( env->shellcode_context.running ) \
+        if ( ARGOS_TRACKSC_IS_TRACKING ) \
         { \
             env->shellcode_context.storedby_eip = env->eip; \
             env->shellcode_context.store_value = (val); \
