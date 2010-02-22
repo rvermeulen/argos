@@ -12,26 +12,8 @@
 #include "win2k/winternl.h"
 #include "argos-tracksc.h"
 
-// We use the cpu_get_phys_page_debug function because the
-// get_phys_addr_code function can throw an cpu exception that will
-// interrupt our analysis loop.
-static target_phys_addr_t get_phys_addr(CPUX86State *env, target_ulong addr)
-{
-    target_phys_addr_t paddr;
-
-    paddr = cpu_get_phys_page_debug(env, addr + env->segs[R_CS].base);
-    if (paddr == -1)
-    {
-        return 0;
-    }
-    else
-    {
-        return ((paddr & TARGET_PAGE_MASK) | (addr & ~TARGET_PAGE_MASK));
-    }
-}
-
 #define PHYS_ADDR(X) \
-    (get_phys_addr(env, (target_ulong)(X)) + \
+    (get_phys_addr_code(env, (target_ulong)(X)) + \
      (target_phys_addr_t) phys_ram_base)
 
 #define VALID_PHYS_ADDR(X)\
@@ -39,26 +21,15 @@ static target_phys_addr_t get_phys_addr(CPUX86State *env, target_ulong addr)
 
 static INSTRUCTION current_instr;
 // The pc must be a host virtual address.
-static int argos_tracksc_instr_len(unsigned long pc);
-static void argos_tracksc_dump_current_instr(argos_shellcode_context_t * context);
-static void argos_tracksc_dump_loaded_modules(CPUX86State * env);
-static target_ulong argos_tracksc_get_current_thread_id(CPUX86State * env);
-static unsigned char argos_tracksc_in_shellcode_context(CPUX86State * env);
-
-int argos_tracksc_instr_len(unsigned long pc)
-{
-    return get_instruction(&current_instr, (BYTE *)pc, MODE_32);
-}
-
-void argos_tracksc_dump_current_instr(argos_shellcode_context_t * context)
-{
-    char instr_str[1024];
-    if (get_instruction_string(&current_instr, FORMAT_INTEL, 0, instr_str,
-                sizeof(instr_str)))
-    {
-        fprintf(context->logfile, "%s", instr_str);
-    }
-}
+static int _get_instr_len(unsigned long pc);
+static void _log_instr(argos_shellcode_context_t * context);
+static void _get_imported_modules(CPUX86State * env);
+static target_ulong _get_current_thread_id(CPUX86State * env);
+static unsigned char _in_shellcode_context(CPUX86State * env);
+static unsigned char _is_tracking(CPUX86State * env);
+static void _save_shellcode_context(CPUX86State * env);
+static void _start_analysis_phase(CPUX86State * env);
+static void _start_tracking_phase(CPUX86State * env);
 
 void argos_tracksc_init(CPUX86State * env)
 {
@@ -68,6 +39,7 @@ void argos_tracksc_init(CPUX86State * env)
     // being tracked.
     memset(&env->shellcode_context, 0, sizeof(argos_shellcode_context_t));
 
+    env->shellcode_context.phase = ARGOS_TRACKSC_PHASE_IDLE;
     // Set the default condition when to stop executing and tracking
     // shell-code.
     env->shellcode_context.stop_condition = SSC_FIRST_SYSTEM_CALL;
@@ -94,7 +66,7 @@ void argos_tracksc_stop(CPUX86State * env)
         fclose(env->shellcode_context.logfile);
         argos_logf("Closed shellcode log file\n");
         env->shellcode_context.logfile = 0;
-        env->shellcode_context.running = 0;
+        env->shellcode_context.phase = ARGOS_TRACKSC_PHASE_IDLE;
     }
 
     argos_tracksc_imported_function * delete_cursor, * next;
@@ -114,52 +86,55 @@ void argos_tracksc_stop(CPUX86State * env)
     }
 }
 
-int argos_tracksc_is_running(CPUX86State * env)
+unsigned char argos_tracksc_is_active( CPUX86State * env)
 {
-    return env->shellcode_context.running;
+    return env->shellcode_context.phase != ARGOS_TRACKSC_PHASE_IDLE;
 }
 
 void argos_tracksc_enable(CPUX86State * env)
 {
-    argos_logf("Starting shell-code tracking...\n");
+    if ( env->shellcode_context.phase == ARGOS_TRACKSC_PHASE_IDLE )
+    {
+        argos_logf("Starting shell-code tracking...\n");
 
-    env->shellcode_context.thread_id = argos_tracksc_get_current_thread_id(env);
-    argos_logf("Code injection detected in thread 0x%x\n",
-            env->shellcode_context.thread_id);
+        // Save context of the shellcode.
+        _save_shellcode_context(env);
 
-    argos_logf("Dumping loaded modules for targeted process.\n");
-    argos_tracksc_dump_loaded_modules(env);
-    argos_logf("Done dumping loaded modules for targeted process.\n");
+        // We are now entering the analysis phase.
+        _start_analysis_phase(env);
 
-    env->shellcode_context.cr3 = env->cr[3];
-    env->shellcode_context.running = 1;
-
-    // We have successfully initialized the shellcode context,
-    // now put the cpu in single step mode to log the shellcode
-    // instructions.
-    argos_logf("Successfully instanciated shellcode tracking, "
-            "switching to single step mode.\n");
-    // Enabling single stepping mode allows us to log
-    // the shellcode instructions in the cpu loop.
-    // With single step mode enabled the TB's contain
-    // only one instruction and an exception is thrown
-    // after the execution of this instruction.
-    // During the handling of this exception (EXCP_DEBUG)
-    // we can log the instruction in the current TB.
-    cpu_single_step(env, 1);
+        // Now shift to tracking phase.
+        _start_tracking_phase(env);
+    }
+    else if ( env->shellcode_context.phase == ARGOS_TRACKSC_PHASE_ANALYZING)
+    {
+        argos_logf("Re-entering analysis phase.\n");
+        // We are now entering the analysis phase.
+        _start_analysis_phase(env);
+    }
+    else if ( env->shellcode_context.phase == ARGOS_TRACKSC_PHASE_TRACKING)
+    {
+        argos_logf("Re-entering tracking phase.\n");
+    }
+    else
+    {
+        argos_logf("Argos tracking found in an invalid phase.\n");
+    }
 }
 
 void argos_tracksc_store_context(CPUX86State * env)
 {
+    argos_logf("Store context.\n");
     // Here we are saving context of the instructions that are 
     // executed during the tracking of shell-code.
     // Everything that is logged is before the execution of the 
     // actual instruction.
     // Check if we are executing a tainted instruction.
     // This assumes that the shell-code is marked tainted by Argos.
-    if (env->shellcode_context.executed_eip != env->eip
-            && argos_tracksc_in_shellcode_context(env)
-            && argos_dest_pc_isdirty(env, env->eip))
+    if ( _is_tracking(env)
+            && _in_shellcode_context(env)
+            && argos_dest_pc_isdirty(env, env->eip)
+            && env->shellcode_context.executed_eip != env->eip)
     {
 #ifdef ARGOS_NET_TRACKER
         unsigned i;
@@ -179,13 +154,13 @@ void argos_tracksc_store_context(CPUX86State * env)
 
         //env->shellcode_context.instruction_size = env->current_tb->size;
         env->shellcode_context.instruction_size =
-            argos_tracksc_instr_len(hp_pc);
+            _get_instr_len(hp_pc);
 
         /*if ( env->current_tb->size !=
-                env->shellcode_context.instruction_size )
-        {
-            argos_logf("!!! Eip offset detected !!!\n");
-        }*/
+          env->shellcode_context.instruction_size )
+          {
+          argos_logf("!!! Eip offset detected !!!\n");
+          }*/
 
         memcpy(env->shellcode_context.instruction, (void *)hp_pc,
                 env->shellcode_context.instruction_size);
@@ -223,7 +198,7 @@ void argos_tracksc_store_context(CPUX86State * env)
     }
 }
 
-void argos_tracksc_log_instruction(CPUX86State * env)
+int argos_tracksc_log_instruction(CPUX86State * env)
 {
     // Here we are going to log the instructions that belong to the shellcode.
     // This is after the execution of the instruction so the eip register points
@@ -260,7 +235,7 @@ void argos_tracksc_log_instruction(CPUX86State * env)
         //        env->shellcode_context.instruction,
         //        env->shellcode_context.instruction_size);
 
-        argos_tracksc_dump_current_instr(&env->shellcode_context);
+        _log_instr(&env->shellcode_context);
 
         fprintf(env->shellcode_context.logfile, "\t");
         fprintf(env->shellcode_context.logfile, " ");
@@ -430,23 +405,28 @@ void argos_tracksc_log_instruction(CPUX86State * env)
                 && env->shellcode_context.instruction_cnt ==
                 MAX_INSTRUCTION_CNT )
         {
-            env->shellcode_context.running = 0;
+            env->shellcode_context.phase = ARGOS_TRACKSC_PHASE_IDLE;
             // For now we just pause the vm.
             vm_stop(0);
         }
+        return 1;
+    }
+    else
+    {
+        return 0;
     }
 }
 
-void argos_tracksc_check_for_system_call(CPUX86State * env)
+void argos_tracksc_check_for_invalid_system_call(CPUX86State * env)
 {
-    if ( env->shellcode_context.is_system_call)
+    if ( _is_tracking(env) && env->shellcode_context.is_system_call)
     {
         // Check the shell-code tracking stop condition.
         if ( env->shellcode_context.stop_condition ==
                 SSC_FIRST_SYSTEM_CALL )
         {
             env->shellcode_context.is_system_call = 0;
-            env->shellcode_context.running = 0;
+            env->shellcode_context.phase = ARGOS_TRACKSC_PHASE_IDLE;
             // The system call number resides in the register eax for the
             // int 0x2e as well for the sysenter system call mechanism.
             fprintf(env->shellcode_context.logfile,
@@ -457,18 +437,29 @@ void argos_tracksc_check_for_system_call(CPUX86State * env)
             vm_stop(0);
         }
     }
-
 }
 
-int argos_tracksc_log_system_call(CPUX86State * env)
+int argos_tracksc_is_valid_system_call(CPUX86State * env)
 {
     // If we are in the correct context.
-    if (argos_tracksc_in_shellcode_context(env))
+    if (_is_tracking(env) && _in_shellcode_context(env))
     {
         argos_logf("The shellcode is trying to make a system call.\n");
         // Flag that a system call is pending.
         env->shellcode_context.is_system_call = 1;
+        return 0;
+    }
+    else
+    {
         return 1;
+    }
+}
+
+int argos_tracksc_logged_invalid_system_call(CPUX86State * env)
+{
+    if ( _is_tracking(env) )
+    {
+        return env->shellcode_context.is_system_call;
     }
     else
     {
@@ -476,12 +467,120 @@ int argos_tracksc_log_system_call(CPUX86State * env)
     }
 }
 
-int argos_tracksc_logged_system_call(CPUX86State * env)
+void argos_tracksc_check_function_call( CPUX86State * env)
 {
-    return env->shellcode_context.is_system_call;
+    if ( _is_tracking(env) && _in_shellcode_context(env) )
+    {
+        argos_logf("Checking function call.\n");
+        if ( !argos_dest_pc_isdirty(env, env->eip))
+        {
+            if (  env->shellcode_context.imported_functions )
+            {
+                // Filter calls done in kernel-mode.
+                // TODO: Have to check for runtime flags /3GB and
+                // /USERVA, because they allow for a greater private
+                // addressing space at the expense of a smaller kernel 
+                // addressing space.
+                if ( env->eip < 0x80000000 )
+                {
+                    argos_tracksc_imported_function * cursor =
+                        env->shellcode_context.imported_functions;
+                    while ( cursor != NULL )
+                    {
+                        if ( cursor->address == env->eip )
+                        {
+                            if (cursor->function)
+                            {
+                                argos_logf("Called imported function %s\n",
+                                        cursor->function);
+                            }
+                            break;
+                        }
+                        else
+                        {
+                            cursor = cursor->next;
+                        }
+                    }
+
+                    if ( cursor == NULL )
+                    {
+                        argos_logf("Called unknown function at 0x%x\n", env->eip);
+                    }
+                }
+            }
+        }
+        else
+        {
+            argos_logf("Called injected function.\n");
+        }
+    }
 }
 
-static void argos_tracksc_dump_loaded_modules(CPUX86State * env)
+static target_ulong _get_current_thread_id(CPUX86State * env)
+{
+    target_ulong gv_fs = 0;
+    target_phys_addr_t hp_fs = 0;
+    PTEB teb = 0;
+
+    // fs:[0x0] contains the Thread Execution Block.
+    gv_fs = env->segs[R_FS].base;
+    hp_fs = PHYS_ADDR(gv_fs);
+    if ( !VALID_PHYS_ADDR(hp_fs))
+    {
+        argos_logf("Failed to obtain physical address of teb.\n");
+        return 0;
+    }
+
+    teb = (PTEB)hp_fs;
+    return teb->Cid.UniqueThread;
+
+}
+
+static unsigned char _in_shellcode_context(CPUX86State * env)
+{
+    target_ulong thread_id = _get_current_thread_id(env);
+    if ( thread_id != 0 )
+    {
+        if ( env->cr[3] == env->shellcode_context.cr3 
+                && thread_id == env->shellcode_context.thread_id )
+        {
+            return 1;
+        }
+        else
+        {
+            return 0;
+        }
+    }
+    else // We use a weaker form of context detection.
+    {
+        argos_logf("Failed to get the current thread id.\n");
+        if ( env->cr[3] == env->shellcode_context.cr3 )
+        {
+            return 1;
+        }
+        else
+        {
+            return 0;
+        }
+    }
+}
+
+static int _get_instr_len(unsigned long pc)
+{
+    return get_instruction(&current_instr, (BYTE *)pc, MODE_32);
+}
+
+static void _log_instr(argos_shellcode_context_t * context)
+{
+    char instr_str[1024];
+    if (get_instruction_string(&current_instr, FORMAT_INTEL, 0, instr_str,
+                sizeof(instr_str)))
+    {
+        fprintf(context->logfile, "%s", instr_str);
+    }
+}
+
+static void _get_imported_modules(CPUX86State * env)
 {
     target_ulong gv_fs = 0;
     target_phys_addr_t hp_fs = 0;
@@ -491,7 +590,9 @@ static void argos_tracksc_dump_loaded_modules(CPUX86State * env)
     LIST_ENTRY module_list;
     PLIST_ENTRY forward_iterator = 0;
     PLDR_DATA_TABLE_ENTRY module_table = 0;
-    argos_tracksc_imported_function * last_inserted = 0;
+    argos_tracksc_imported_function * last_inserted =
+        env->shellcode_context.analysis_context.last_inserted_import;
+    unsigned current_module_idx = 0;
 
     // fs:[0x0] contains the Thread Execution Block.
     gv_fs = env->segs[R_FS].base;
@@ -529,163 +630,186 @@ static void argos_tracksc_dump_loaded_modules(CPUX86State * env)
     module_table = (PLDR_DATA_TABLE_ENTRY)forward_iterator;
     while ( module_table->BaseAddress != 0 )
     {
-        printf("Module base: 0x%x\n", module_table->BaseAddress);
+        if ( current_module_idx <
+                env->shellcode_context.analysis_context.current_module_idx )
+        {
+            argos_logf("Skipping already analyzed module.\n");
+            goto next;
+        }
+        argos_logf("Module base: 0x%x\n", module_table->BaseAddress);
 
-            PIMAGE_DOS_HEADER dos_hdr = (PIMAGE_DOS_HEADER) 
-                PHYS_ADDR(module_table->BaseAddress);
-            if ( !VALID_PHYS_ADDR(dos_hdr) )
+        PIMAGE_DOS_HEADER dos_hdr = (PIMAGE_DOS_HEADER) 
+            PHYS_ADDR(module_table->BaseAddress);
+        if ( !VALID_PHYS_ADDR(dos_hdr) )
+        {
+            argos_logf("Failed to obtain physical address of dos header.\n");
+            goto next;
+        }
+
+        if ( dos_hdr->e_magic == IMAGE_DOS_SIGNATURE  )
+        {
+            PIMAGE_NT_HEADERS pe_hdr = (PIMAGE_NT_HEADERS)
+                PHYS_ADDR(module_table->BaseAddress
+                        + dos_hdr->e_lfanew);
+            if ( !VALID_PHYS_ADDR(pe_hdr) )
             {
-                argos_logf("Failed to obtain physical address of dos header.\n");
+                argos_logf("Failed to obtain physical address of pe header.\n");
                 goto next;
             }
 
-            if ( dos_hdr->e_magic == IMAGE_DOS_SIGNATURE  )
+            if ( pe_hdr->Signature == IMAGE_PE_SIGNATURE )
             {
-                PIMAGE_NT_HEADERS pe_hdr = (PIMAGE_NT_HEADERS)
-                    PHYS_ADDR(module_table->BaseAddress
-                            + dos_hdr->e_lfanew);
-                if ( !VALID_PHYS_ADDR(pe_hdr) )
-                {
-                    argos_logf("Failed to obtain physical address of pe header.\n");
-                    goto next;
-                }
+                PIMAGE_DATA_DIRECTORY export_data_dir = 0;
+                //argos_logf("Found valid pe signature!\n");
 
-                if ( pe_hdr->Signature == IMAGE_PE_SIGNATURE )
+                if ( pe_hdr->OptionalHeader.NumberOfRvaAndSizes > 0 )
                 {
-                    PIMAGE_DATA_DIRECTORY export_data_dir = 0;
-                    //argos_logf("Found valid pe signature!\n");
-
-                    if ( pe_hdr->OptionalHeader.NumberOfRvaAndSizes > 0 )
+                    export_data_dir =
+                        &pe_hdr->OptionalHeader.DataDirectory[0];
+                    if ( export_data_dir->VirtualAddress != 0 )
                     {
-                        export_data_dir =
-                            &pe_hdr->OptionalHeader.DataDirectory[0];
-                        if ( export_data_dir->VirtualAddress != 0 )
+                        PIMAGE_EXPORT_DIRECTORY export_dir =
+                            (PIMAGE_EXPORT_DIRECTORY)
+                            PHYS_ADDR(module_table->BaseAddress +
+                                    export_data_dir->VirtualAddress);
+                        if ( !VALID_PHYS_ADDR(export_dir) )
                         {
-                            PIMAGE_EXPORT_DIRECTORY export_dir =
-                                (PIMAGE_EXPORT_DIRECTORY)
-                                PHYS_ADDR(module_table->BaseAddress +
-                                        export_data_dir->VirtualAddress);
-                            if ( !VALID_PHYS_ADDR(export_dir) )
+                            argos_logf("Failed to obtain physical address of export directory.\n");
+                            goto next;
+                        }
+
+                        target_ulong addresses =
+                            module_table->BaseAddress
+                            + export_dir->AddressOfFunctions;
+
+                        target_ulong names =
+                            module_table->BaseAddress
+                            + export_dir->AddressOfNames;
+
+                        target_ulong nameOrdinals =
+                            module_table->BaseAddress
+                            + export_dir->AddressOfNameOrdinals;
+
+                        unsigned i, skipped_imports = 0;;
+
+                        char * module_name =
+                            (char*)PHYS_ADDR(module_table->BaseAddress
+                                    + export_dir->Name);
+
+                        if ( !VALID_PHYS_ADDR(module_name) )
+                        {
+                            argos_logf("Failed to obtain physical address of module name.\n");
+                            goto next;
+                        }
+
+                        printf("Found module %s\n", module_name);
+                        for (i = 0; i < export_dir->NumberOfFunctions; i++)
+                        {
+                            if ( i <
+                                    env->shellcode_context.analysis_context.current_import_idx)
                             {
-                                argos_logf("Failed to obtain physical address of export directory.\n");
-                                goto next;
+                                skipped_imports++;
+                                continue;
                             }
 
-                            target_ulong addresses =
-                                module_table->BaseAddress
-                                + export_dir->AddressOfFunctions;
+                            target_phys_addr_t function_ordinal_addr = 0;
+                            argos_tracksc_imported_function * imported_function =
+                                malloc(sizeof(argos_tracksc_imported_function));
 
-                            target_ulong names =
-                                module_table->BaseAddress
-                                + export_dir->AddressOfNames;
-
-                            target_ulong nameOrdinals =
-                                module_table->BaseAddress
-                                + export_dir->AddressOfNameOrdinals;
-
-                            unsigned i;
-
-                            char * module_name =
-                                (char*)PHYS_ADDR(module_table->BaseAddress
-                                        + export_dir->Name);
-
-                            if ( !VALID_PHYS_ADDR(module_name) )
+                            if ( imported_function == NULL )
                             {
-                                argos_logf("Failed to obtain physical address of module name.\n");
-                                goto next;
+                                argos_logf("Failed to allocate memory to store imported functions!!!\n");
+                                return;
                             }
+                            memset(imported_function, 0,
+                                    sizeof(argos_tracksc_imported_function));
 
-                            printf("Found module %s\n", module_name);
-                            for (i = 0; i < export_dir->NumberOfFunctions; i++)
+                            imported_function->module = strdup(module_name);
+
+                            if ( i < export_dir->NumberOfNames)
                             {
-                                target_phys_addr_t function_ordinal_addr = 0;
-                                argos_tracksc_imported_function * imported_function =
-                                    malloc(sizeof(argos_tracksc_imported_function));
-
-                                if ( imported_function == NULL )
+                                target_phys_addr_t function_name_rva =
+                                    PHYS_ADDR(names + i * sizeof(DWORD) );
+                                if ( VALID_PHYS_ADDR(function_name_rva) )
                                 {
-                                    argos_logf("Failed to allocate memory to store imported functions!!!\n");
-                                    return;
-                                }
-                                memset(imported_function, 0, sizeof(argos_tracksc_imported_function));
+                                    target_phys_addr_t function_name_addr =
+                                        PHYS_ADDR( module_table->BaseAddress
+                                                + *((DWORD*)function_name_rva));
 
-                                imported_function->module = strdup(module_name);
-
-                                if ( i < export_dir->NumberOfNames)
-                                {
-                                    target_phys_addr_t function_name_rva =
-                                        PHYS_ADDR(names + i * sizeof(DWORD) );
-                                    if ( VALID_PHYS_ADDR(function_name_rva) )
+                                    if (VALID_PHYS_ADDR(function_name_addr))
                                     {
-                                        target_phys_addr_t function_name_addr =
-                                            PHYS_ADDR( module_table->BaseAddress
-                                                    + *((DWORD*)function_name_rva));
-
-                                        if (VALID_PHYS_ADDR(function_name_addr))
-                                        {
-                                            char * function_name = (char*)function_name_addr;
-                                            //argos_logf("%s ", function_name);
-                                            imported_function->function = strdup(function_name);
-                                        }
-                                        else
-                                        {
-                                            argos_logf("Invalid physical address of function name.\n");
-                                        }
+                                        char * function_name =
+                                            (char*)function_name_addr;
+                                        //argos_logf("%s ", function_name);
+                                        imported_function->function =
+                                            strdup(function_name);
                                     }
                                     else
                                     {
-                                        argos_logf("Invalid physical address of function name rva.\n");
-                                    }
-                                }
-
-                                function_ordinal_addr = PHYS_ADDR(nameOrdinals
-                                        + i * sizeof(WORD) );
-                                if ( VALID_PHYS_ADDR(function_ordinal_addr) )
-                                {
-                                    target_phys_addr_t function_paddr = 0;
-                                    WORD ordinal = *((WORD*)function_ordinal_addr);
-                                    imported_function->ordinal = ordinal + export_dir->Base;
-                                    //argos_logf("%i ", ordinal + export_dir->Base);
-
-                                    function_paddr = PHYS_ADDR(addresses +
-                                            (ordinal - export_dir->Base) * sizeof(DWORD));
-                                    if ( VALID_PHYS_ADDR(function_paddr) )
-                                    {
-                                        target_ulong function_addr = module_table->BaseAddress
-                                            + *((DWORD*)function_paddr);
-                                        imported_function->address = function_addr;
-                                        //argos_logf("0x%x", function_addr);
-                                    }
-                                    else
-                                    {
-                                        argos_logf("Invalid physical address of function address.\n");
+                                        argos_logf("Invalid physical address of function name.\n");
                                     }
                                 }
                                 else
                                 {
-                                    argos_logf("Invalid physical address of function ordinal.\n");
+                                    argos_logf("Invalid physical address of function name rva.\n");
                                 }
-                                //argos_logf("\n");
+                            }
 
-                                if ( last_inserted )
+                            function_ordinal_addr = PHYS_ADDR(nameOrdinals
+                                    + i * sizeof(WORD) );
+                            if ( VALID_PHYS_ADDR(function_ordinal_addr) )
+                            {
+                                target_phys_addr_t function_paddr = 0;
+                                WORD ordinal = *((WORD*)function_ordinal_addr);
+                                imported_function->ordinal = ordinal + export_dir->Base;
+                                //argos_logf("%i ", ordinal + export_dir->Base);
+
+                                function_paddr = PHYS_ADDR(addresses +
+                                        (ordinal - export_dir->Base) * sizeof(DWORD));
+                                if ( VALID_PHYS_ADDR(function_paddr) )
                                 {
-                                    last_inserted = last_inserted->next = imported_function;
+                                    target_ulong function_addr = module_table->BaseAddress
+                                        + *((DWORD*)function_paddr);
+                                    imported_function->address = function_addr;
+                                    //argos_logf("0x%x", function_addr);
                                 }
                                 else
                                 {
-                                    // If last_inserted is not set we assume that the no imported functions
-                                    // are added to the list.
-                                    env->shellcode_context.imported_functions = last_inserted = imported_function;
+                                    argos_logf("Invalid physical address of function address.\n");
                                 }
                             }
+                            else
+                            {
+                                argos_logf("Invalid physical address of function ordinal.\n");
+                            }
+                            //argos_logf("\n");
+
+                            if ( last_inserted )
+                            {
+                                env->shellcode_context.analysis_context.last_inserted_import
+                                    = last_inserted = last_inserted->next
+                                    = imported_function;
+                            }
+                            else
+                            {
+                                // If last_inserted is not set we assume that the no imported functions
+                                // are added to the list.
+                                env->shellcode_context.imported_functions =
+                                    last_inserted = imported_function;
+                            }
+                            env->shellcode_context.analysis_context.current_import_idx++;
                         }
-                        else
-                        {
-                            printf("Module has no export table!\n");
-                        }
+                        // Reset the imported function index for the next module.
+                        env->shellcode_context.analysis_context.current_import_idx = 0;
+                        argos_logf("Skipped %u imports.\n", skipped_imports);
+                    }
+                    else
+                    {
+                        printf("Module has no export table!\n");
                     }
                 }
             }
+        }
 
 next:
         forward_iterator = (PLIST_ENTRY) PHYS_ADDR(forward_iterator->Flink);
@@ -695,100 +819,46 @@ next:
             return;
         }
         module_table = (PLDR_DATA_TABLE_ENTRY)forward_iterator;
+      env->shellcode_context.analysis_context.current_module_idx
+          = current_module_idx++;
     }
 }
 
-void argos_tracksc_check_function_call( CPUX86State * env)
+static void _save_shellcode_context(CPUX86State * env)
 {
-    if ( env->shellcode_context.running && argos_tracksc_in_shellcode_context(env) )
-    {
-        if ( !argos_dest_pc_isdirty(env, env->eip))
-        {
-            if (  env->shellcode_context.imported_functions )
-            {
-                // Filter calls done in kernel-mode.
-                // TODO: Have to check for runtime flags /3GB and
-                // /USERVA, because they allow for a greater private
-                // addressing space at the expense of a smaller kernel 
-                // addressing space.
-                if ( env->eip < 0x80000000 )
-                {
-                    argos_tracksc_imported_function * cursor =
-                        env->shellcode_context.imported_functions;
-                    while ( cursor != NULL )
-                    {
-                        if ( cursor->address == env->eip )
-                        {
-                            if (cursor->function)
-                            {
-                                argos_logf("Called imported function %s\n", cursor->function);
-                            }
-                            break;
-                        }
-                        else
-                        {
-                            cursor = cursor->next;
-                        }
-                    }
-
-                    if ( cursor == NULL )
-                    {
-                        argos_logf("Called unknown function at 0x%x\n", env->eip);
-                    }
-                }
-            }
-        }
-        else
-        {
-            argos_logf("Called injected function.\n");
-        }
-    }
+    argos_logf("The context uses the cr3 register and the thread id.\n");
+    env->shellcode_context.cr3 = env->cr[3];
+    env->shellcode_context.thread_id = _get_current_thread_id(env);
 }
 
-static target_ulong argos_tracksc_get_current_thread_id(CPUX86State * env)
+static void _start_analysis_phase(CPUX86State * env)
 {
-    target_ulong gv_fs = 0;
-    target_phys_addr_t hp_fs = 0;
-    PTEB teb = 0;
+    env->shellcode_context.phase = ARGOS_TRACKSC_PHASE_ANALYZING;
 
-    // fs:[0x0] contains the Thread Execution Block.
-    gv_fs = env->segs[R_FS].base;
-    hp_fs = PHYS_ADDR(gv_fs);
-    if ( !VALID_PHYS_ADDR(hp_fs))
-    {
-        argos_logf("Failed to obtain physical address of teb.\n");
-        return 0;
-    }
-
-    teb = (PTEB)hp_fs;
-    return teb->Cid.UniqueThread;
-
+    argos_logf("Dumping loaded modules for targeted process.\n");
+    _get_imported_modules(env);
+    argos_logf("Done dumping loaded modules for targeted process.\n");
 }
 
-static unsigned char argos_tracksc_in_shellcode_context(CPUX86State * env)
+static void _start_tracking_phase(CPUX86State * env)
 {
-    target_ulong thread_id = argos_tracksc_get_current_thread_id(env);
-    if ( thread_id != 0 )
-    {
-        if ( env->cr[3] == env->shellcode_context.cr3 
-                && thread_id == env->shellcode_context.thread_id )
-        {
-            return 1;
-        }
-        else
-        {
-            return 0;
-        }
-    }
-    else // We use a weaker form of context detection.
-    {
-        if ( env->cr[3] == env->shellcode_context.cr3 )
-        {
-            return 1;
-        }
-        else
-        {
-            return 0;
-        }
-    }
+    env->shellcode_context.phase = ARGOS_TRACKSC_PHASE_TRACKING;
+    // We have successfully initialized the shellcode context,
+    // now put the cpu in single step mode to log the shellcode
+    // instructions.
+    argos_logf("Successfully instanciated shellcode tracking, "
+            "switching to single step mode.\n");
+    // Enabling single stepping mode allows us to log
+    // the shellcode instructions in the cpu loop.
+    // With single step mode enabled the TB's contain
+    // only one instruction and an exception is thrown
+    // after the execution of this instruction.
+    // During the handling of this exception (EXCP_DEBUG)
+    // we can log the instruction in the current TB.
+    cpu_single_step(env, 1);
+}
+
+static unsigned char _is_tracking(CPUX86State * env)
+{
+    return env->shellcode_context.phase == ARGOS_TRACKSC_PHASE_TRACKING;
 }
