@@ -1349,9 +1349,11 @@ void raise_interrupt(int intno, int is_int, int error_code,
        Windows 2000 uses the interrupt 2E to make system calls.
        Newer operating systems however uses the instruction sysenter.
        */
-    if ( argos_tracksc_is_running(env) && intno == 0x2E)
+    if ( intno == 0x2E)
     {
-        argos_tracksc_log_system_call(env);
+        // Because this is an interrupt we don't have to check the return
+        // value because, since there is no alternative path of execution.
+        argos_tracksc_is_valid_system_call(env);
     }
 
     env->exception_index = intno;
@@ -2793,12 +2795,9 @@ void helper_lret_protected(int shift, int addend)
 void helper_sysenter(void)
 {
 
-    if ( argos_tracksc_is_running(env))
+    if (!argos_tracksc_is_valid_system_call(env))
     {
-        if (argos_tracksc_log_system_call(env))
-        {
-            cpu_loop_exit();
-        }
+        cpu_loop_exit();
     }
 
     if (env->sysenter_cs == 0) {
