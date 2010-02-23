@@ -58,12 +58,6 @@ typedef struct _argos_tracksc_imported_function
     target_ulong address;
 } argos_tracksc_imported_function;
 
-typedef struct _argos_tracksc_analysis_context
-{
-    argos_tracksc_imported_function * last_inserted_import;
-    unsigned current_module_idx;
-    unsigned current_import_idx;
-} argos_tracksc_analysis_context;
 // The argos shellcode context contains the context that is needed to
 // to track the execution of shellcode and the bytes referenced by
 // the shellcode instructions.
@@ -121,6 +115,5 @@ typedef struct _argos_tracksc_context
     // Number of stored bytes
     unsigned store_size;
     argos_tracksc_imported_function * imported_functions;
-    argos_tracksc_analysis_context analysis_context;
 } argos_shellcode_context_t;
 #endif
