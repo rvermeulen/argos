@@ -46,7 +46,6 @@ void argos_tracksc_init(CPUX86State * env)
 
     snprintf(filename, filename_size,  LOG_SC_FL_TEMPLATE,
             argos_instance_id);
-    //argos_logf("Generated shellcode log filename %s.\n", filename);
     env->shellcode_context.logfile = fopen(filename, "wb");
     if (!env->shellcode_context.logfile) 
     {
@@ -93,6 +92,7 @@ unsigned char argos_tracksc_is_active( CPUX86State * env)
 
 void argos_tracksc_enable(CPUX86State * env)
 {
+    argos_logf("Starting eip: 0x%x\n", env->eip);
     if ( env->shellcode_context.phase == ARGOS_TRACKSC_PHASE_IDLE )
     {
         argos_logf("Starting shell-code tracking...\n");
@@ -111,6 +111,8 @@ void argos_tracksc_enable(CPUX86State * env)
         argos_logf("Re-entering analysis phase.\n");
         // We are now entering the analysis phase.
         _start_analysis_phase(env);
+        // Now shift to tracking phase.
+        _start_tracking_phase(env);
     }
     else if ( env->shellcode_context.phase == ARGOS_TRACKSC_PHASE_TRACKING)
     {
@@ -124,7 +126,6 @@ void argos_tracksc_enable(CPUX86State * env)
 
 void argos_tracksc_store_context(CPUX86State * env)
 {
-    argos_logf("Store context.\n");
     // Here we are saving context of the instructions that are 
     // executed during the tracking of shell-code.
     // Everything that is logged is before the execution of the 
@@ -200,10 +201,10 @@ void argos_tracksc_store_context(CPUX86State * env)
 
 int argos_tracksc_log_instruction(CPUX86State * env)
 {
-    // Here we are going to log the instructions that belong to the shellcode.
-    // This is after the execution of the instruction so the eip register points
-    // to the next instruction.
-    // If something logged.
+    // Here we are going to log the instructions that belong to the 
+    // shellcode.
+    // This is after the execution of the instruction so the eip register 
+    // points to the next instruction.
     if (env->shellcode_context.logged)
     {
         unsigned i;
@@ -588,9 +589,9 @@ static void _get_imported_modules(CPUX86State * env)
     PPEB peb = 0;
     PPEB_LDR_DATA ldr_data = 0;
     LIST_ENTRY module_list;
-    PLIST_ENTRY forward_iterator = 0;
+    PLIST_ENTRY fwd_iter = 0;
     PLDR_DATA_TABLE_ENTRY module_table = 0;
-    argos_tracksc_imported_function * last_inserted =
+    argos_tracksc_imported_function * last_import =
         env->shellcode_context.analysis_context.last_inserted_import;
     unsigned current_module_idx = 0;
 
@@ -618,16 +619,15 @@ static void _get_imported_modules(CPUX86State * env)
         return;
     }
 
-
     module_list = ldr_data->InLoadOrderModuleList;
-    forward_iterator = (PLIST_ENTRY) PHYS_ADDR(module_list.Flink);
-    if ( !VALID_PHYS_ADDR(forward_iterator) )
+    fwd_iter = (PLIST_ENTRY) PHYS_ADDR(module_list.Flink);
+    if ( !VALID_PHYS_ADDR(fwd_iter) )
     {
         argos_logf("Failed to obtain physical address of Flink.\n");
         return;
     }
 
-    module_table = (PLDR_DATA_TABLE_ENTRY)forward_iterator;
+    module_table = (PLDR_DATA_TABLE_ENTRY)fwd_iter;
     while ( module_table->BaseAddress != 0 )
     {
         if ( current_module_idx <
@@ -642,185 +642,199 @@ static void _get_imported_modules(CPUX86State * env)
             PHYS_ADDR(module_table->BaseAddress);
         if ( !VALID_PHYS_ADDR(dos_hdr) )
         {
-            argos_logf("Failed to obtain physical address of dos header.\n");
+            argos_logf("Failed to obtain physical address \
+                    of dos header.\n");
             goto next;
         }
 
-        if ( dos_hdr->e_magic == IMAGE_DOS_SIGNATURE  )
+        if ( dos_hdr->e_magic != IMAGE_DOS_SIGNATURE  )
         {
-            PIMAGE_NT_HEADERS pe_hdr = (PIMAGE_NT_HEADERS)
-                PHYS_ADDR(module_table->BaseAddress
-                        + dos_hdr->e_lfanew);
-            if ( !VALID_PHYS_ADDR(pe_hdr) )
+            argos_logf("Imported module has an invalid dos signature.\n");
+            goto next;
+        }
+
+        PIMAGE_NT_HEADERS pe_hdr = (PIMAGE_NT_HEADERS)
+            PHYS_ADDR(module_table->BaseAddress
+                    + dos_hdr->e_lfanew);
+        if ( !VALID_PHYS_ADDR(pe_hdr) )
+        {
+            argos_logf("Failed to obtain physical address of pe header.\n");
+            goto next;
+        }
+
+        if ( pe_hdr->Signature != IMAGE_PE_SIGNATURE )
+        {
+            argos_logf("Imported module has an invalid pe signature.\n");
+            goto next;
+        }
+
+
+        if ( pe_hdr->OptionalHeader.NumberOfRvaAndSizes == 0 )
+        {
+            goto next;
+        }
+
+        PIMAGE_DATA_DIRECTORY export_data_dir
+            = &pe_hdr->OptionalHeader.DataDirectory[0];
+        if ( export_data_dir->VirtualAddress == 0 )
+        {
+            argos_logf("Module has no export table!\n");
+            goto next;
+        }
+
+        PIMAGE_EXPORT_DIRECTORY export_dir =
+            (PIMAGE_EXPORT_DIRECTORY)
+            PHYS_ADDR(module_table->BaseAddress +
+                    export_data_dir->VirtualAddress);
+        if ( !VALID_PHYS_ADDR(export_dir) )
+        {
+            argos_logf("Failed to obtain physical address of export \
+                    directory.\n");
+            goto next;
+        }
+
+        target_ulong addresses =
+            module_table->BaseAddress
+            + export_dir->AddressOfFunctions;
+
+        target_ulong names =
+            module_table->BaseAddress
+            + export_dir->AddressOfNames;
+
+        target_ulong nameOrdinals =
+            module_table->BaseAddress
+            + export_dir->AddressOfNameOrdinals;
+
+        unsigned i, skipped_imports = 0;;
+
+        char * module_name =
+            (char*)PHYS_ADDR(module_table->BaseAddress
+                    + export_dir->Name);
+
+        if ( !VALID_PHYS_ADDR(module_name) )
+        {
+            argos_logf("Failed to obtain physical address \
+                    of module name.\n");
+            goto next;
+        }
+
+        printf("Found module %s\n", module_name);
+        for (i = 0; i < export_dir->NumberOfFunctions; i++)
+        {
+            if ( i <
+                    env->shellcode_context.analysis_context.current_import_idx)
             {
-                argos_logf("Failed to obtain physical address of pe header.\n");
-                goto next;
+                skipped_imports++;
+                continue;
             }
 
-            if ( pe_hdr->Signature == IMAGE_PE_SIGNATURE )
+            target_phys_addr_t function_ordinal_addr = 0;
+            argos_tracksc_imported_function
+                * import =
+                malloc( sizeof
+                        (
+                         argos_tracksc_imported_function
+                        ));
+
+            if ( import == NULL )
             {
-                PIMAGE_DATA_DIRECTORY export_data_dir = 0;
-                //argos_logf("Found valid pe signature!\n");
+                argos_logf("Failed to allocate memory to \
+                        store imported functions!!!\n");
+                return;
+            }
+            memset(import, 0, sizeof(argos_tracksc_imported_function));
 
-                if ( pe_hdr->OptionalHeader.NumberOfRvaAndSizes > 0 )
+            import->module = strdup(module_name);
+
+            if ( i < export_dir->NumberOfNames)
+            {
+                target_phys_addr_t function_name_rva =
+                    PHYS_ADDR(names + i * sizeof(DWORD) );
+                if ( VALID_PHYS_ADDR(function_name_rva) )
                 {
-                    export_data_dir =
-                        &pe_hdr->OptionalHeader.DataDirectory[0];
-                    if ( export_data_dir->VirtualAddress != 0 )
+                    target_phys_addr_t function_name_addr =
+                        PHYS_ADDR( module_table->BaseAddress
+                                + *((DWORD*)function_name_rva));
+
+                    if (VALID_PHYS_ADDR(function_name_addr))
                     {
-                        PIMAGE_EXPORT_DIRECTORY export_dir =
-                            (PIMAGE_EXPORT_DIRECTORY)
-                            PHYS_ADDR(module_table->BaseAddress +
-                                    export_data_dir->VirtualAddress);
-                        if ( !VALID_PHYS_ADDR(export_dir) )
-                        {
-                            argos_logf("Failed to obtain physical address of export directory.\n");
-                            goto next;
-                        }
-
-                        target_ulong addresses =
-                            module_table->BaseAddress
-                            + export_dir->AddressOfFunctions;
-
-                        target_ulong names =
-                            module_table->BaseAddress
-                            + export_dir->AddressOfNames;
-
-                        target_ulong nameOrdinals =
-                            module_table->BaseAddress
-                            + export_dir->AddressOfNameOrdinals;
-
-                        unsigned i, skipped_imports = 0;;
-
-                        char * module_name =
-                            (char*)PHYS_ADDR(module_table->BaseAddress
-                                    + export_dir->Name);
-
-                        if ( !VALID_PHYS_ADDR(module_name) )
-                        {
-                            argos_logf("Failed to obtain physical address of module name.\n");
-                            goto next;
-                        }
-
-                        printf("Found module %s\n", module_name);
-                        for (i = 0; i < export_dir->NumberOfFunctions; i++)
-                        {
-                            if ( i <
-                                    env->shellcode_context.analysis_context.current_import_idx)
-                            {
-                                skipped_imports++;
-                                continue;
-                            }
-
-                            target_phys_addr_t function_ordinal_addr = 0;
-                            argos_tracksc_imported_function * imported_function =
-                                malloc(sizeof(argos_tracksc_imported_function));
-
-                            if ( imported_function == NULL )
-                            {
-                                argos_logf("Failed to allocate memory to store imported functions!!!\n");
-                                return;
-                            }
-                            memset(imported_function, 0,
-                                    sizeof(argos_tracksc_imported_function));
-
-                            imported_function->module = strdup(module_name);
-
-                            if ( i < export_dir->NumberOfNames)
-                            {
-                                target_phys_addr_t function_name_rva =
-                                    PHYS_ADDR(names + i * sizeof(DWORD) );
-                                if ( VALID_PHYS_ADDR(function_name_rva) )
-                                {
-                                    target_phys_addr_t function_name_addr =
-                                        PHYS_ADDR( module_table->BaseAddress
-                                                + *((DWORD*)function_name_rva));
-
-                                    if (VALID_PHYS_ADDR(function_name_addr))
-                                    {
-                                        char * function_name =
-                                            (char*)function_name_addr;
-                                        //argos_logf("%s ", function_name);
-                                        imported_function->function =
-                                            strdup(function_name);
-                                    }
-                                    else
-                                    {
-                                        argos_logf("Invalid physical address of function name.\n");
-                                    }
-                                }
-                                else
-                                {
-                                    argos_logf("Invalid physical address of function name rva.\n");
-                                }
-                            }
-
-                            function_ordinal_addr = PHYS_ADDR(nameOrdinals
-                                    + i * sizeof(WORD) );
-                            if ( VALID_PHYS_ADDR(function_ordinal_addr) )
-                            {
-                                target_phys_addr_t function_paddr = 0;
-                                WORD ordinal = *((WORD*)function_ordinal_addr);
-                                imported_function->ordinal = ordinal + export_dir->Base;
-                                //argos_logf("%i ", ordinal + export_dir->Base);
-
-                                function_paddr = PHYS_ADDR(addresses +
-                                        (ordinal - export_dir->Base) * sizeof(DWORD));
-                                if ( VALID_PHYS_ADDR(function_paddr) )
-                                {
-                                    target_ulong function_addr = module_table->BaseAddress
-                                        + *((DWORD*)function_paddr);
-                                    imported_function->address = function_addr;
-                                    //argos_logf("0x%x", function_addr);
-                                }
-                                else
-                                {
-                                    argos_logf("Invalid physical address of function address.\n");
-                                }
-                            }
-                            else
-                            {
-                                argos_logf("Invalid physical address of function ordinal.\n");
-                            }
-                            //argos_logf("\n");
-
-                            if ( last_inserted )
-                            {
-                                env->shellcode_context.analysis_context.last_inserted_import
-                                    = last_inserted = last_inserted->next
-                                    = imported_function;
-                            }
-                            else
-                            {
-                                // If last_inserted is not set we assume that the no imported functions
-                                // are added to the list.
-                                env->shellcode_context.imported_functions =
-                                    last_inserted = imported_function;
-                            }
-                            env->shellcode_context.analysis_context.current_import_idx++;
-                        }
-                        // Reset the imported function index for the next module.
-                        env->shellcode_context.analysis_context.current_import_idx = 0;
-                        argos_logf("Skipped %u imports.\n", skipped_imports);
+                        char * function_name =
+                            (char*)function_name_addr;
+                        import->function =
+                            strdup(function_name);
                     }
                     else
                     {
-                        printf("Module has no export table!\n");
+                        argos_logf("Invalid physical address of function \
+                                name.\n");
                     }
                 }
+                else
+                {
+                    argos_logf("Invalid physical address of function name \
+                            rva.\n");
+                }
             }
+
+            function_ordinal_addr = PHYS_ADDR(nameOrdinals
+                    + i * sizeof(WORD) );
+            if ( VALID_PHYS_ADDR(function_ordinal_addr) )
+            {
+                target_phys_addr_t function_paddr = 0;
+                WORD ordinal = *((WORD*)function_ordinal_addr);
+                import->ordinal = ordinal + export_dir->Base;
+
+                function_paddr = PHYS_ADDR(addresses +
+                        (ordinal - export_dir->Base) * sizeof(DWORD));
+                if ( VALID_PHYS_ADDR(function_paddr) )
+                {
+                    target_ulong function_addr = module_table->BaseAddress
+                        + *((DWORD*)function_paddr);
+                    import->address = function_addr;
+                }
+                else
+                {
+                    argos_logf("Invalid physical address of function \
+                            address.\n");
+                }
+            }
+            else
+            {
+                argos_logf("Invalid physical address of function \
+                        ordinal.\n");
+            }
+
+            if ( last_import )
+            {
+                env->shellcode_context.analysis_context.last_inserted_import
+                    = last_import = last_import->next
+                    = import;
+            }
+            else
+            {
+                // If last_import is not set we assume that the no 
+                // imported functions are added to the list.
+                env->shellcode_context.imported_functions =
+                    last_import = import;
+            }
+            env->shellcode_context.analysis_context.current_import_idx++;
         }
+        // Reset the imported function index for the next module.
+        env->shellcode_context.analysis_context.current_import_idx = 0;
+        argos_logf("Loaded %u - Skipped %u imports.\n", 
+                export_dir->NumberOfFunctions - skipped_imports,
+                skipped_imports);
 
 next:
-        forward_iterator = (PLIST_ENTRY) PHYS_ADDR(forward_iterator->Flink);
-        if ( !VALID_PHYS_ADDR(forward_iterator) )
-        {
-            argos_logf("Failed to obtain physical address of next module.\n");
-            return;
-        }
-        module_table = (PLDR_DATA_TABLE_ENTRY)forward_iterator;
-      env->shellcode_context.analysis_context.current_module_idx
-          = current_module_idx++;
+    fwd_iter = (PLIST_ENTRY) PHYS_ADDR(fwd_iter->Flink);
+    if ( !VALID_PHYS_ADDR(fwd_iter) )
+    {
+        argos_logf("Failed to obtain physical address of next module.\n");
+        return;
+    }
+    module_table = (PLDR_DATA_TABLE_ENTRY)fwd_iter;
+    env->shellcode_context.analysis_context.current_module_idx
+        = ++current_module_idx;
     }
 }
 
