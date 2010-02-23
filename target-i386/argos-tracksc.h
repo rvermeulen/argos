@@ -35,7 +35,7 @@ void argos_tracksc_init(CPUX86State * env);
 void argos_tracksc_stop(CPUX86State * env);
 void argos_tracksc_enable(CPUX86State * env);
 void argos_tracksc_store_context(CPUX86State * env);
-int argos_tracksc_log_instruction(CPUX86State * env);
+void argos_tracksc_log_instruction(CPUX86State * env);
 void argos_tracksc_check_for_invalid_system_call(CPUX86State * env);
 int argos_tracksc_logged_invalid_system_call(CPUX86State * env);
 int argos_tracksc_is_valid_system_call(CPUX86State * env);
