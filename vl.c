@@ -8327,7 +8327,11 @@ static int main_loop(void)
             }
             if (ret == EXCP_DEBUG) 
             {
-                if ( !argos_tracksc_log_instruction(env) )
+                if ( argos_tracksc_is_active(env) )
+                {
+                    argos_tracksc_log_instruction(env);
+                }
+                else
                 {
                     vm_stop(EXCP_DEBUG);
                 }
