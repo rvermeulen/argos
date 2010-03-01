@@ -85,7 +85,7 @@ void argos_alert(CPUX86State *env, target_ulong new_pc, argos_rtag_t *tag,
         // initialize the shell-code context if tracking
         // is enabled and if we detect code injection 
         // (e.g. we are executing tainted instructions).
-        if ( code == ARGOS_ALERT_CI )
+        if ( !argos_tracksc_is_active(env) && code == ARGOS_ALERT_CI )
         {
             argos_tracksc_enable(env);
         }
