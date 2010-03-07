@@ -12,12 +12,18 @@
 #include "win2k/winternl.h"
 #include "argos-tracksc.h"
 
-#define PHYS_ADDR(X) \
-    (cpu_get_phys_page_debug(env, (target_ulong)(X)) + \
-     (target_phys_addr_t) phys_ram_base)
+// Windows NT builds a safeguard into every process's address space.
+// Both the upper and lower 65536 bytes of the address space are
+// permanently reserverd by the system.
+#define VALID_PTR(X) \
+    ( ((((X) >> 4) == 0x0) || (((X) >> 4) == 0x7FFF))?0:1 )
 
-#define VALID_PHYS_ADDR(X)\
-    ( (target_phys_addr_t)(X) > (target_phys_addr_t)phys_ram_base)
+#define PHYS_ADDR(X) \
+   ((X) + ((target_phys_addr_t) phys_ram_base))
+#define PHYS_OFFSET(X) \
+    (cpu_get_phys_page_debug(env, (target_ulong)(X)))
+#define VALID_PHYS_OFFSET(X)\
+    ( (X) != -1 )
 
 static INSTRUCTION current_instr;
 // The pc must be a host virtual address.
@@ -340,7 +346,7 @@ void argos_tracksc_log_instruction(CPUX86State * env)
                 {
                     if (env->shellcode_context.store_value_netidx != 0)
                     {
-                        netidx = 
+                        netidx =
                             env->shellcode_context.store_value_netidx + i;
                     }
                     else
@@ -449,7 +455,6 @@ void argos_tracksc_check_function_call( CPUX86State * env)
 {
     if ( _is_tracking(env) && _in_shellcode_context(env) )
     {
-        argos_logf("Checking function call.\n");
         if ( !argos_dest_pc_isdirty(env, env->eip))
         {
             if (  env->shellcode_context.imported_functions )
@@ -496,22 +501,17 @@ void argos_tracksc_check_function_call( CPUX86State * env)
 
 static target_ulong _get_current_thread_id(CPUX86State * env)
 {
-    target_ulong gv_fs = 0;
-    target_phys_addr_t hp_fs = 0;
-    TEB * teb = 0;
-
-    // fs:[0x0] contains the Thread Execution Block.
-    gv_fs = env->segs[R_FS].base;
-    hp_fs = PHYS_ADDR(gv_fs);
-    if ( !VALID_PHYS_ADDR(hp_fs))
+    // fs:[0x18] contains a flat pointer to the Thread Execution Block.
+    target_phys_addr_t offset_of_teb =
+        PHYS_OFFSET(env->segs[R_FS].base);
+    if ( !VALID_PHYS_OFFSET(offset_of_teb))
     {
         argos_logf("Failed to obtain physical address of teb.\n");
         return 0;
     }
 
-    teb = (TEB *)hp_fs;
+    TEB * teb = (TEB *)PHYS_ADDR(offset_of_teb);
     return teb->Cid.UniqueThread;
-
 }
 
 static unsigned char _in_shellcode_context(CPUX86State * env)
@@ -544,43 +544,53 @@ static void _log_instr(argos_shellcode_context_t * context)
 
 static void _get_imported_modules(CPUX86State * env)
 {
-    target_ulong gv_fs = 0;
-    target_phys_addr_t hp_fs = 0;
-    TEB * teb = 0;
-    PEB * peb = 0;
-    PEB_LDR_DATA * ldr_data = 0;
-    LIST_ENTRY module_list;
-    LIST_ENTRY * fwd_iter = 0;
     LDR_DATA_TABLE_ENTRY * module_table = 0;
     argos_tracksc_imported_function * last_import = NULL;
 
-    // fs:[0x0] contains the Thread Execution Block.
-    gv_fs = env->segs[R_FS].base;
-    hp_fs = PHYS_ADDR(gv_fs);
-    if ( !VALID_PHYS_ADDR(hp_fs))
-    {
-        argos_logf("Failed to obtain physical address of teb.\n");
-        return;
-    }
+    // fs:[0x18] contains a pointer to the Thread Execution Block.
+    /*target_phys_addr_t offset_of_teb = PHYS_OFFSET(env->segs[R_FS].base);
+      if ( !VALID_PHYS_OFFSET(offset_of_teb) )
+      {
+      argos_logf("Failed to obtain physical address of teb.\n");
+      return;
+      }
 
-    teb = (TEB *)hp_fs;
-    peb = (PEB *)PHYS_ADDR(teb->Peb);
-    if ( !VALID_PHYS_ADDR(peb) )
+      TEB * teb = (TEB *)PHYS_ADDR(offset_of_teb);
+      argos_logf("TEB->Peb: 0x%x\n", teb->Peb);*/
+
+    //target_phys_addr_t offset_of_peb = PHYS_OFFSET(teb->Peb);
+    target_phys_addr_t offset_of_peb =
+        PHYS_OFFSET(env->segs[R_FS].base+0x30);
+    if ( !VALID_PHYS_OFFSET(offset_of_peb) )
     {
         argos_logf("Failed to obtain physical address of peb.\n");
         return;
     }
+    PEB * peb = (PEB*)PHYS_ADDR(offset_of_peb);
 
-    ldr_data = (PEB_LDR_DATA *) PHYS_ADDR(peb->LoaderData);
-    if ( !VALID_PHYS_ADDR(ldr_data) )
+    argos_logf("PEB->ImageBaseAddress: 0x%x\n", peb->ImageBaseAddress);
+    argos_logf("PEB->LoaderData: 0x%x\n", peb->LoaderData);
+    target_phys_addr_t offset_of_ldr_data = PHYS_OFFSET(peb->LoaderData);
+    if ( !VALID_PHYS_OFFSET(offset_of_ldr_data) )
     {
         argos_logf("Failed to obtain physical address of loader data.\n");
         return;
     }
 
-    module_list = ldr_data->InLoadOrderModuleList;
-    fwd_iter = (LIST_ENTRY *) PHYS_ADDR(module_list.Flink);
-    if ( !VALID_PHYS_ADDR(fwd_iter) )
+    PEB_LDR_DATA * ppeb_ldr_data =
+        (PEB_LDR_DATA*) PHYS_ADDR(offset_of_ldr_data);
+
+    if ( !ppeb_ldr_data->Initialized )
+    {
+        argos_logf("The process loader data is not initialized!\n");
+        return;
+    }
+
+    LIST_ENTRY loaded_modules = ppeb_ldr_data->InLoadOrderModuleList;
+
+    argos_logf("LIST_ENTRY->Flink: 0x%x\n", loaded_modules.Flink);
+    LIST_ENTRY * fwd_iter = (LIST_ENTRY *)PHYS_OFFSET(loaded_modules.Flink);
+    if ( !VALID_PHYS_OFFSET(fwd_iter) )
     {
         argos_logf("Failed to obtain physical address of Flink.\n");
         return;
@@ -592,8 +602,8 @@ static void _get_imported_modules(CPUX86State * env)
         argos_logf("Module base: 0x%x\n", module_table->BaseAddress);
 
         IMAGE_DOS_HEADER * dos_hdr = (IMAGE_DOS_HEADER *)
-            PHYS_ADDR(module_table->BaseAddress);
-        if ( !VALID_PHYS_ADDR(dos_hdr) )
+            PHYS_OFFSET(module_table->BaseAddress);
+        if ( !VALID_PHYS_OFFSET(dos_hdr) )
         {
             argos_logf("Failed to obtain physical address \
                     of dos header.\n");
@@ -607,9 +617,9 @@ static void _get_imported_modules(CPUX86State * env)
         }
 
         IMAGE_NT_HEADERS * pe_hdr = (IMAGE_NT_HEADERS *)
-            PHYS_ADDR(module_table->BaseAddress
+            PHYS_OFFSET(module_table->BaseAddress
                     + dos_hdr->e_lfanew);
-        if ( !VALID_PHYS_ADDR(pe_hdr) )
+        if ( !VALID_PHYS_OFFSET(pe_hdr) )
         {
             argos_logf("Failed to obtain physical address of pe header.\n");
             goto next;
@@ -637,9 +647,9 @@ static void _get_imported_modules(CPUX86State * env)
 
         IMAGE_EXPORT_DIRECTORY * export_dir =
             (IMAGE_EXPORT_DIRECTORY *)
-            PHYS_ADDR(module_table->BaseAddress +
+            PHYS_OFFSET(module_table->BaseAddress +
                     export_data_dir.VirtualAddress);
-        if ( !VALID_PHYS_ADDR(export_dir) )
+        if ( !VALID_PHYS_OFFSET(export_dir) )
         {
             argos_logf("Failed to obtain physical address of export \
                     directory.\n");
@@ -660,10 +670,10 @@ static void _get_imported_modules(CPUX86State * env)
 
 
         char * module_name =
-            (char*)PHYS_ADDR(module_table->BaseAddress
+            (char*)PHYS_OFFSET(module_table->BaseAddress
                     + export_dir->Name);
 
-        if ( !VALID_PHYS_ADDR(module_name) )
+        if ( !VALID_PHYS_OFFSET(module_name) )
         {
             argos_logf("Failed to obtain physical address \
                     of module name.\n");
@@ -695,14 +705,14 @@ static void _get_imported_modules(CPUX86State * env)
             if ( i < export_dir->NumberOfNames)
             {
                 target_phys_addr_t function_name_rva =
-                    PHYS_ADDR(names + i * sizeof(DWORD) );
-                if ( VALID_PHYS_ADDR(function_name_rva) )
+                    PHYS_OFFSET(names + i * sizeof(DWORD) );
+                if ( VALID_PHYS_OFFSET(function_name_rva) )
                 {
                     target_phys_addr_t function_name_addr =
-                        PHYS_ADDR( module_table->BaseAddress
+                        PHYS_OFFSET( module_table->BaseAddress
                                 + *((DWORD*)function_name_rva));
 
-                    if (VALID_PHYS_ADDR(function_name_addr))
+                    if (VALID_PHYS_OFFSET(function_name_addr))
                     {
                         char * function_name =
                             (char*)function_name_addr;
@@ -722,17 +732,17 @@ static void _get_imported_modules(CPUX86State * env)
                 }
             }
 
-            function_ordinal_addr = PHYS_ADDR(nameOrdinals
+            function_ordinal_addr = PHYS_OFFSET(nameOrdinals
                     + i * sizeof(WORD) );
-            if ( VALID_PHYS_ADDR(function_ordinal_addr) )
+            if ( VALID_PHYS_OFFSET(function_ordinal_addr) )
             {
                 target_phys_addr_t function_paddr = 0;
                 WORD ordinal = *((WORD*)function_ordinal_addr);
                 import->ordinal = ordinal + export_dir->Base;
 
-                function_paddr = PHYS_ADDR(addresses +
+                function_paddr = PHYS_OFFSET(addresses +
                         (ordinal - export_dir->Base) * sizeof(DWORD));
-                if ( VALID_PHYS_ADDR(function_paddr) )
+                if ( VALID_PHYS_OFFSET(function_paddr) )
                 {
                     target_ulong function_addr = module_table->BaseAddress
                         + *((DWORD*)function_paddr);
@@ -764,8 +774,8 @@ static void _get_imported_modules(CPUX86State * env)
         }
 
 next:
-        fwd_iter = (LIST_ENTRY *) PHYS_ADDR(fwd_iter->Flink);
-        if ( !VALID_PHYS_ADDR(fwd_iter) )
+        fwd_iter = (LIST_ENTRY *) PHYS_OFFSET(fwd_iter->Flink);
+        if ( !VALID_PHYS_OFFSET(fwd_iter) )
         {
             argos_logf("Failed to obtain physical address of next module.\n");
             return;
@@ -776,9 +786,11 @@ next:
 
 static void _save_shellcode_context(CPUX86State * env)
 {
-    argos_logf("The context uses the cr3 register and the thread id.\n");
     env->shellcode_context.cr3 = env->cr[3];
     env->shellcode_context.thread_id = _get_current_thread_id(env);
+    argos_logf("Context: CR3 = 0x%x Thead Id = %u.\n",
+            env->shellcode_context.cr3,
+            env->shellcode_context.thread_id);
 }
 
 static void _start_analysis_phase(CPUX86State * env)
