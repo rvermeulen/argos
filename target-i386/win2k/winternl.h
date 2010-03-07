@@ -5,7 +5,7 @@
 
 // We define a target pointer types since the guest width may differ
 // with the host width (e.g. 32 bit guest on 64 bit host).
-typedef uint32_t target_ptr_t;
+typedef target_ulong target_ptr_t;
 
 //typedef uint8_t BYTE;
 typedef int16_t SHORT;
@@ -35,53 +35,58 @@ typedef target_ptr_t PPS_POST_PROCESS_INIT_ROUTINE;
 //typedef void (*PPEBLOCKROUTINE)(PVOID PebLock); 
 typedef target_ptr_t PPEBLOCKROUTINE;
 
-typedef union _LARGE_INTEGER {
+union _LARGE_INTEGER {
     struct {
         DWORD LowPart;
         LONG HighPart;
-    };
+    } __attribute__((packed));
 
     struct {
         DWORD LowPart;
         LONG HighPart;
-    } u;
+    } u __attribute__((packed));
     LONGLONG QuadPart;
-} LARGE_INTEGER ;//__attribute__((aligned(8)));
+} __attribute__((packed));
+typedef union _LARGE_INTEGER LARGE_INTEGER;
 typedef target_ptr_t PLARGE_INTEGER;
 
 typedef target_ptr_t PLIST_ENTRY;
-typedef struct _LIST_ENTRY {
+struct _LIST_ENTRY {
     PLIST_ENTRY Flink;
     PLIST_ENTRY Blink;
-} LIST_ENTRY ;//__attribute__((aligned(8)));
+} __attribute__((packed));
+typedef struct _LIST_ENTRY LIST_ENTRY;
 
-typedef target_ptr_t PANSI_STRING;
-typedef struct _STRING {
+struct _STRING {
     USHORT  Length;
     USHORT  MaximumLength;
     PCHAR  Buffer;
-} ANSI_STRING ;//__attribute__((aligned(8)));
+} __attribute__((packed));
+typedef struct _STRING ANSI_STRING;
+typedef target_ptr_t PANSI_STRING;
 
-typedef target_ptr_t PLSA_UNICODE_STRING;
-typedef target_ptr_t PUNICODE_STRING;
-typedef struct _LSA_UNICODE_STRING {
+struct _LSA_UNICODE_STRING {
     USHORT Length;
     USHORT MaximumLength;
     PWSTR  Buffer;
-}LSA_UNICODE_STRING, UNICODE_STRING ;//__attribute__((aligned(8)));
+} __attribute__((packed));
+typedef struct _LSA_UNICODE_STRING LSA_UNICODE_STRING;
+typedef struct _LSA_UNICODE_STRING UNICODE_STRING;
+typedef target_ptr_t PLSA_UNICODE_STRING;
+typedef target_ptr_t PUNICODE_STRING;
 
-typedef target_ptr_t PPEB_LDR_DATA;
-typedef struct _PEB_LDR_DATA {
+struct _PEB_LDR_DATA {
     ULONG Length;
     BOOLEAN Initialized;
     PVOID SsHandle;
     LIST_ENTRY InLoadOrderModuleList;
     LIST_ENTRY InMemoryOrderModuleList;
     LIST_ENTRY InInitializationOrderModuleList;
-} PEB_LDR_DATA ;//__attribute__((aligned(8)));
+} __attribute__((packed));
+typedef struct _PEB_LDR_DATA PEB_LDR_DATA;
+typedef target_ptr_t PPEB_LDR_DATA;
 
-typedef target_ptr_t PLDR_DATA_TABLE_ENTRY;
-typedef struct _LDR_DATA_TABLE_ENTRY {
+struct _LDR_DATA_TABLE_ENTRY {
     LIST_ENTRY InLoadOrderModuleList;
     LIST_ENTRY InMemoryOrderModuleList;
     LIST_ENTRY InInitializationOrderModuleList;
@@ -95,18 +100,20 @@ typedef struct _LDR_DATA_TABLE_ENTRY {
     SHORT TlsIndex;
     LIST_ENTRY HashTableEntry;
     ULONG TimeDateStamp;
-} LDR_DATA_TABLE_ENTRY ;//__attribute__((aligned(8)));
+} __attribute__((packed));
+typedef struct _LDR_DATA_TABLE_ENTRY LDR_DATA_TABLE_ENTRY;
+typedef target_ptr_t PLDR_DATA_TABLE_ENTRY;
 
-typedef target_ptr_t PRTL_DRIVE_LETTER_CURDIR;
-typedef struct _RTL_DRIVE_LETTER_CURDIR {
+struct _RTL_DRIVE_LETTER_CURDIR {
     USHORT Flags;
     USHORT Length;
     ULONG TimeStamp;
     UNICODE_STRING DosPath;
-} RTL_DRIVE_LETTER_CURDIR ;//__attribute__((aligned(8)));
+} __attribute__((packed));
+typedef struct _RTL_DRIVE_LETTER_CURDIR RTL_DRIVE_LETTER_CURDIR;
+typedef target_ptr_t PRTL_DRIVE_LETTER_CURDIR;
 
-typedef target_ptr_t PRTL_USER_PROCESS_PARAMETERS;
-typedef struct _RTL_USER_PROCESS_PARAMETERS {
+struct _RTL_USER_PROCESS_PARAMETERS {
     ULONG MaximumLength;
     ULONG Length;
     ULONG Flags;
@@ -136,16 +143,18 @@ typedef struct _RTL_USER_PROCESS_PARAMETERS {
     UNICODE_STRING ShellInfo;
     UNICODE_STRING RuntimeData;
     RTL_DRIVE_LETTER_CURDIR DLCurrentDirectory[0x20];
-} RTL_USER_PROCESS_PARAMETERS ;//__attribute__((aligned(8)));
+} __attribute__((packed));
+typedef struct _RTL_USER_PROCESS_PARAMETERS RTL_USER_PROCESS_PARAMETERS;
+typedef target_ptr_t PRTL_USER_PROCESS_PARAMETERS;
 
 typedef target_ptr_t PPEB_FREE_BLOCK;
-typedef struct _PEB_FREE_BLOCK {
+struct _PEB_FREE_BLOCK {
     PPEB_FREE_BLOCK Next;
     ULONG Size;
-} PEB_FREE_BLOCK ;//__attribute__((aligned(8)));
+} __attribute__((packed));
+typedef struct _PEB_FREE_BLOCK PEB_FREE_BLOCK;
 
-typedef target_ptr_t PPEB;
-typedef struct _PEB {
+struct _PEB {
     BOOLEAN InheritedAddressSpace;
     BOOLEAN ReadImageFileExecOptions;
     BOOLEAN BeingDebugged;
@@ -200,10 +209,12 @@ typedef struct _PEB {
     ULONG TlsExpansionBitmap;
     BYTE TlsExpansionBitmapBits[0x80];
     ULONG SessionId;
-} PEB ;//__attribute__((aligned(8)));
+} __attribute__((packed));
+typedef struct _PEB PEB;
+typedef target_ptr_t PPEB;
 
 typedef target_ptr_t PEXCEPTION_RECORD;
-typedef struct _EXCEPTION_RECORD
+struct _EXCEPTION_RECORD
 {
     LONG ExceptionCode;
     ULONG ExceptionFlags;
@@ -211,16 +222,18 @@ typedef struct _EXCEPTION_RECORD
     PVOID ExceptionAddress;
     ULONG NumberParameters;
     ULONG ExceptionInformation[15];
-} EXCEPTION_RECORD ;//__attribute__((aligned(8)));
+} __attribute__((packed));
+typedef struct _EXCEPTION_RECORD EXCEPTION_RECORD;
 
 typedef target_ptr_t PEXCEPTION_REGISTRATION_RECORD;
-typedef struct _EXCEPTION_REGISTRATION_RECORD {
+struct _EXCEPTION_REGISTRATION_RECORD {
     PEXCEPTION_REGISTRATION_RECORD Next;
     PVOID Handler;
-} EXCEPTION_REGISTRATION_RECORD ;//__attribute__((aligned(8)));
+} __attribute__((packed));
+typedef struct _EXCEPTION_REGISTRATION_RECORD EXCEPTION_REGISTRATION_RECORD;
 
 typedef target_ptr_t PNT_TIB;
-typedef struct _NT_TIB
+struct _NT_TIB
 {
     PEXCEPTION_REGISTRATION_RECORD ExceptionList;
     PVOID StackBase;
@@ -230,20 +243,21 @@ typedef struct _NT_TIB
     {
         PVOID FiberData;
         ULONG Version;
-    };
+    } __attribute((packed));
     PVOID ArbitraryUserPointer;
-    PNT_TIB* Self;
-} NT_TIB ;//__attribute__((aligned(8)));
+    PNT_TIB Self;
+} __attribute__((packed));
+typedef struct _NT_TIB NT_TIB;
 
-typedef target_ptr_t PCLIENT_ID;
-typedef struct _CLIENT_ID
+struct _CLIENT_ID
 {
     PVOID UniqueProcess;
     PVOID UniqueThread;
-} CLIENT_ID ;//__attribute__((aligned(8)));
+} __attribute__((packed));
+typedef struct _CLIENT_ID CLIENT_ID;
+typedef target_ptr_t PCLIENT_ID;
 
-typedef target_ptr_t PTEB;
-typedef struct _TEB {
+struct _TEB {
     NT_TIB Tib;
     PVOID EnvironmentPointer;
     CLIENT_ID Cid;
@@ -301,11 +315,12 @@ typedef struct _TEB {
     PVOID StackCommit;
     PVOID StackCommitMax;
     PVOID StackReserved;
-} TEB ;//__attribute__((aligned(8)));
+} __attribute__((packed));
+typedef struct _TEB TEB;
+typedef target_ptr_t PTEB;
 
 #define IMAGE_DOS_SIGNATURE 0x5A4D
-typedef target_ptr_t PIMAGE_DOS_HEADER;
-typedef struct _IMAGE_DOS_HEADER
+struct _IMAGE_DOS_HEADER
 {
     WORD e_magic;
     WORD e_cblp;
@@ -326,10 +341,11 @@ typedef struct _IMAGE_DOS_HEADER
     WORD e_oeminfo;
     WORD e_res2[10];
     LONG e_lfanew;
-} IMAGE_DOS_HEADER ;//__attribute__((aligned(8)));
+} __attribute__((packed));
+typedef struct _IMAGE_DOS_HEADER IMAGE_DOS_HEADER;
+typedef target_ptr_t PIMAGE_DOS_HEADER;
 
-typedef target_ptr_t PIMAGE_FILE_HEADER;
-typedef struct _IMAGE_FILE_HEADER {
+struct _IMAGE_FILE_HEADER {
     WORD  Machine;
     WORD  NumberOfSections;
     DWORD TimeDateStamp;
@@ -337,17 +353,19 @@ typedef struct _IMAGE_FILE_HEADER {
     DWORD NumberOfSymbols;
     WORD  SizeOfOptionalHeader;
     WORD  Characteristics;
-} IMAGE_FILE_HEADER ;//__attribute__((aligned(8)));
+} __attribute__((packed));
+typedef struct _IMAGE_FILE_HEADER IMAGE_FILE_HEADER;
+typedef target_ptr_t PIMAGE_FILE_HEADER;
 
-typedef target_ptr_t PIMAGE_DATA_DIRECTORY;
-typedef struct _IMAGE_DATA_DIRECTORY {
+struct _IMAGE_DATA_DIRECTORY {
     DWORD VirtualAddress;
     DWORD Size;
-} IMAGE_DATA_DIRECTORY ;//__attribute__((aligned(8)));
+} __attribute__((packed));
+typedef struct _IMAGE_DATA_DIRECTORY IMAGE_DATA_DIRECTORY;
+typedef target_ptr_t PIMAGE_DATA_DIRECTORY;
 
 #define IMAGE_NUMBEROF_DIRECTORY_ENTRIES 16
-typedef target_ptr_t PIMAGE_OPTIONAL_HEADER;
-typedef struct _IMAGE_OPTIONAL_HEADER {
+struct _IMAGE_OPTIONAL_HEADER {
     WORD                 Magic;
     BYTE                 MajorLinkerVersion;
     BYTE                 MinorLinkerVersion;
@@ -379,18 +397,20 @@ typedef struct _IMAGE_OPTIONAL_HEADER {
     DWORD                LoaderFlags;
     DWORD                NumberOfRvaAndSizes;
     IMAGE_DATA_DIRECTORY DataDirectory[IMAGE_NUMBEROF_DIRECTORY_ENTRIES];
-} IMAGE_OPTIONAL_HEADER ;//__attribute__((aligned(8)));
+} __attribute__((packed));
+typedef struct _IMAGE_OPTIONAL_HEADER IMAGE_OPTIONAL_HEADER;
+typedef target_ptr_t PIMAGE_OPTIONAL_HEADER;
 
 #define IMAGE_PE_SIGNATURE 0x00004550
-typedef target_ptr_t PIMAGE_NT_HEADERS;
-typedef struct _IMAGE_NT_HEADERS {
+struct _IMAGE_NT_HEADERS {
     DWORD                 Signature;
     IMAGE_FILE_HEADER     FileHeader;
     IMAGE_OPTIONAL_HEADER OptionalHeader;
-} IMAGE_NT_HEADERS ;//__attribute__((aligned(8)));
+} __attribute__((packed));
+typedef struct _IMAGE_NT_HEADERS IMAGE_NT_HEADERS;
+typedef target_ptr_t PIMAGE_NT_HEADERS;
 
-typedef target_ptr_t PIMAGE_EXPORT_DIRECTORY;
-typedef struct _IMAGE_EXPORT_DIRECTORY {
+struct _IMAGE_EXPORT_DIRECTORY {
     DWORD Characteristics;
     DWORD TimeDateStamp;
     WORD MajorVersion;
@@ -402,6 +422,8 @@ typedef struct _IMAGE_EXPORT_DIRECTORY {
     DWORD AddressOfFunctions;
     DWORD AddressOfNames;
     DWORD AddressOfNameOrdinals;
-} IMAGE_EXPORT_DIRECTORY ;//__attribute__((aligned(8)));
+} __attribute__((packed));
+typedef struct _IMAGE_EXPORT_DIRECTORY IMAGE_EXPORT_DIRECTORY;
+typedef target_ptr_t PIMAGE_EXPORT_DIRECTORY;
 
 #endif
