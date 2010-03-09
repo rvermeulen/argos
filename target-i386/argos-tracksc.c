@@ -14,7 +14,6 @@
 
 target_phys_addr_t _phys_addr(CPUX86State *env, target_ulong addr)
 {
-
     target_phys_addr_t paddr =
         cpu_get_phys_page_debug(env, addr + env->segs[R_CS].base);
     if (paddr != -1)
@@ -33,7 +32,6 @@ target_phys_addr_t _phys_addr(CPUX86State *env, target_ulong addr)
     }
     else
     {
-        argos_logf("Invalid page address for  0x%08x\n", addr);
         return 0;
     }
 }
@@ -54,7 +52,7 @@ static unsigned char _is_tracking(CPUX86State * env);
 static void _save_shellcode_context(CPUX86State * env);
 static void _start_analysis_phase(CPUX86State * env);
 static void _start_tracking_phase(CPUX86State * env);
-static uint8_t _listed_imported_modules;
+//static uint8_t _listed_imported_modules;
 extern void vm_stop(int reason);
 
 void argos_tracksc_init(CPUX86State * env)
@@ -83,7 +81,7 @@ void argos_tracksc_init(CPUX86State * env)
         argos_logf("Opened shellcode log file %s.\n", filename);
     }
 
-    _listed_imported_modules = 0;
+   // _listed_imported_modules = 0;
 }
 
 void argos_tracksc_stop(CPUX86State * env)
@@ -475,13 +473,6 @@ void argos_tracksc_check_function_call( CPUX86State * env)
 {
     if ( _is_tracking(env) && _in_shellcode_context(env) )
     {
-        if ( !_listed_imported_modules  )
-        {
-             argos_logf("Dumping loaded modules for targeted process.\n");
-             _get_imported_modules(env);
-             argos_logf("Done dumping loaded modules for targeted process.\n");
-             _listed_imported_modules = 1;
-        }
 
         if ( !argos_dest_pc_isdirty(env, env->eip))
         {
@@ -572,33 +563,35 @@ static void _log_instr(argos_shellcode_context_t * context)
 static void _get_imported_modules(CPUX86State * env)
 {
     target_ulong vaddr_of_teb = env->segs[R_FS].base;
-    argos_logf("teb: 0x%08x\n", vaddr_of_teb);
+    //argos_logf("teb: 0x%08x\n", vaddr_of_teb);
 
+    // _TEB;
     target_phys_addr_t paddr_of_teb = PHYS_ADDR(vaddr_of_teb);
     if (!VALID_PTR(paddr_of_teb))
     {
         argos_logf("Invalid pointer to teb: 0x%016lx\n", paddr_of_teb);
     }
 
+    // _TEB.ProcessEnvironmentBlock
     target_ulong  vaddr_of_peb = *((target_ulong*) (paddr_of_teb + 0x30));
-    argos_logf("peb: 0x%08x\n", vaddr_of_peb);
+    //argos_logf("peb: 0x%08x\n", vaddr_of_peb);
 
+    // _PEB
     target_phys_addr_t paddr_of_peb = PHYS_ADDR(vaddr_of_peb);
     if (!VALID_PTR(paddr_of_peb))
     {
         argos_logf("Invalid pointer to peb: 0x%016lx\n", paddr_of_teb);
     }
-    target_ulong base = *((target_ulong*)(paddr_of_peb + 0x8));
-    argos_logf("ImageBaseAddress: 0x%08x\n", base);
 
-    uint32_t * paddr_of_base =
-        (uint32_t *)PHYS_ADDR(vaddr_of_peb + 0x8);
-    base = *paddr_of_base;
-    argos_logf("ImageBaseAddress: 0x%08x\n", base);
+    // _PEB.ImageBaseAddress
+    target_ulong target_base = *((target_ulong*)(paddr_of_peb + 0x8));
+    //argos_logf("ImageBaseAddress: 0x%08x\n", target_base);
 
+    // _PEB.Ldr
     target_ulong vaddr_ldr_data = *((target_ulong*)(paddr_of_peb + 0xc));
-    argos_logf("LdrData: 0x%08x\n", vaddr_ldr_data);
+    //argos_logf("LdrData: 0x%08x\n", vaddr_ldr_data);
 
+    // _PEB_LDR_DATA
     target_phys_addr_t paddr_ldr_data =
         PHYS_ADDR(vaddr_ldr_data);
     if (!VALID_PTR(paddr_ldr_data))
@@ -607,30 +600,72 @@ static void _get_imported_modules(CPUX86State * env)
                 paddr_ldr_data);
     }
 
-    uint32_t length = *((uint32_t*)paddr_ldr_data);
-    argos_logf("LdrData length: 0x%x\n", length);
+    //target_ulong length = *((target_ulong*)paddr_ldr_data);
+    //argos_logf("LdrData length: 0x%x\n", length);
+    // _PEB_LDR_DATA.Initialized
     uint8_t initialized = *((uint8_t*)paddr_ldr_data + 0x4);
-    argos_logf("LdrData initialized: 0x%x\n", initialized);
+    //argos_logf("LdrData initialized: 0x%x\n", initialized);
 
     if ( initialized )
     {
-        LIST_ENTRY * module_list = (LIST_ENTRY*)(paddr_ldr_data + 0xc);
-        argos_logf("Flink: 0x%08x \n", module_list->Flink);
+        target_phys_addr_t module_list = paddr_ldr_data + 0xc;
+        //argos_logf("Flink: 0x%08x \n", *(target_ulong*)module_list);
 
+        target_phys_addr_t ldr_data_entry =
+            PHYS_ADDR(*(target_ulong*)module_list);
 
-        LDR_DATA_TABLE_ENTRY * ldr_data_entry =
-            (LDR_DATA_TABLE_ENTRY *) PHYS_ADDR(module_list->Flink);
-
+        argos_logf("%10s\t%10s\t%s\n", "start:", "end:", "module:");
         while(1)
         {
             if ( VALID_PTR(ldr_data_entry) )
             {
-                argos_logf("Module base: 0x%08x\n",
-                        ldr_data_entry->BaseAddress);
+                target_ulong module_base =
+                    *(target_ulong*)(ldr_data_entry + 0x18);
+                argos_logf("0x%08x", module_base);
 
-                IMAGE_DOS_HEADER * dos_hdr =
-                    (IMAGE_DOS_HEADER *)
-                    PHYS_ADDR(ldr_data_entry->BaseAddress);
+                // _LDR_DATA_TABLE_ENTRY.BaseDllName.Length
+                uint16_t basename_length =
+                    (*(uint16_t*)(ldr_data_entry + 0x2c))
+                    / sizeof(uint16_t);
+                if ( basename_length > 0 && basename_length < 256 )
+                {
+                    uint16_t * basename_buffer =
+                        (uint16_t *)PHYS_ADDR(
+                                (*(target_ulong*)(ldr_data_entry + 0x30)));
+
+                    if ( VALID_PTR(basename_buffer) )
+                    {
+                        // Converting utf16 to ascii, 
+                        // the fast and incomplete way.
+                        argos_logf("\t");
+                        uint16_t i;
+                        for (i = 0; i < 256; i++)
+                        {
+                            if ( i < basename_length )
+                            {
+                                uint16_t c = basename_buffer[i];
+                                if ( (c & 0xFF00) == 0 )
+                                {
+                                    char dc = (c & 0xFF );
+                                    argos_logf("%c", dc);
+                                }
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+                    }
+                }
+
+
+                if ( target_base == module_base )
+                {
+                    goto next_module;
+                }
+
+                // IMAGE_DOS_HEADER
+                target_phys_addr_t dos_hdr = PHYS_ADDR(module_base);
 
                 if ( !VALID_PTR(dos_hdr) )
                 {
@@ -638,15 +673,17 @@ static void _get_imported_modules(CPUX86State * env)
                     goto next_module;
                 }
 
-                if ( dos_hdr->e_magic != IMAGE_DOS_SIGNATURE  )
+                // IMAGE_DOS_HEADER.e_magic
+                if ( *(uint16_t*)dos_hdr != IMAGE_DOS_SIGNATURE  )
                 {
                     argos_logf("Module has an invalid dos signature.\n");
                     goto next_module;
                 }
 
-                IMAGE_NT_HEADERS * pe_hdr = (IMAGE_NT_HEADERS *)
-                    PHYS_ADDR(ldr_data_entry->BaseAddress
-                            + dos_hdr->e_lfanew);
+                // IMAGE_NT_HEADERS
+                target_phys_addr_t pe_hdr =
+                    PHYS_ADDR(module_base
+                            + *(target_ulong*)(dos_hdr+0x3c));
 
                 if ( !VALID_PTR(pe_hdr) )
                 {
@@ -654,54 +691,90 @@ static void _get_imported_modules(CPUX86State * env)
                     goto next_module;
                 }
 
-                if ( pe_hdr->Signature != IMAGE_PE_SIGNATURE )
+                // IMAGE_NT_HEADERS.Signature
+                if ( *(target_ulong*)pe_hdr != IMAGE_PE_SIGNATURE )
                 {
                     argos_logf("Module has an invalid pe signature.\n");
                     goto next_module;
                 }
 
-                if ( pe_hdr->OptionalHeader.NumberOfRvaAndSizes == 0 )
+                // IMAGE_OPTIONAL_HEADER.SizeOfImage;
+                target_ulong size_of_image =
+                    *(target_ulong*)(pe_hdr + 0x50);
+
+                // IMAGE_OPTIONAL_HEADER.NumberOfRvaAndSizes
+                if ( *(target_ulong*)(pe_hdr + 0x74) == 0 )
                 {
                     argos_logf("Module has no sections!\n");
                     goto next_module;
                 }
 
-                IMAGE_DATA_DIRECTORY export_data_dir
-                    = pe_hdr->OptionalHeader.DataDirectory[0];
-                if ( export_data_dir.VirtualAddress == 0 )
+                // IMAGE_OPTIONAL_HEADER.DataDirectory[0].VirtualAddress
+                target_ulong vir_addr_export_dir =
+                    *(target_ulong*)(pe_hdr + 0x78);
+
+                if ( vir_addr_export_dir == 0 )
                 {
-                    argos_logf("Module has no export table!\n");
-                    goto next_module;
-                }
-        
-                IMAGE_EXPORT_DIRECTORY * export_dir =
-                    (IMAGE_EXPORT_DIRECTORY *)
-                    PHYS_ADDR(ldr_data_entry->BaseAddress +
-                            export_data_dir.VirtualAddress);
-                if ( !VALID_PTR(export_dir) )
-                {
-                    argos_logf("Invalid physical addr of export directory.\n");
+                    argos_logf("\t%u", 0);
                     goto next_module;
                 }
 
-                char * module_name =
-                    (char*)PHYS_ADDR(ldr_data_entry->BaseAddress
-                    + export_dir->Name);
+                target_phys_addr_t export_dir =
+                    PHYS_ADDR(module_base + vir_addr_export_dir);
+                if (!VALID_PTR(export_dir))
+                {
+                    argos_logf("\t?");
+                    goto next_module;
+                }
 
-                if ( !VALID_PTR(module_name) )
+                // IMAGE_EXPORT_DIR.NumberOfFunctions
+                target_ulong numOfFunctions =
+                    *(target_ulong*)(export_dir + 0x14);
+                argos_logf("\t%u", numOfFunctions);
+
+                // IMAGE_EXPORT_DIR.AddressOfFunctions
+                target_ulong addresses_rva =
+                   *(target_ulong*)(export_dir + 0x1C);
+
+                target_phys_addr_t addresses =
+                    PHYS_ADDR(module_base + addresses_rva);
+
+                if ( !VALID_PTR(addresses) )
                 {
                     goto next_module;
                 }
 
-                argos_logf("Module: %s\n", module_name);
+                // IMAGE_EXPORT_DIR.AddressOfFunctions
+                target_ulong names_rva =
+                   *(target_ulong*)(export_dir + 0x1C);
+
+                target_phys_addr_t names =
+                    PHYS_ADDR(module_base + names_rva);
+
+                if ( !VALID_PTR(names) )
+                {
+                    goto next_module;
+                }
+
+                // IMAGE_EXPORT_DIR.AddressOfNameOrdinals
+                target_ulong ordinals_rva =
+                   *(target_ulong*)(export_dir + 0x24);
+
+                target_phys_addr_t ordinals =
+                    PHYS_ADDR(module_base + ordinals);
+
+                if ( !VALID_PTR(ordinals) )
+                {
+                    goto next_module;
+                }
 next_module:
-                argos_logf("Flink: 0x%08x \n",
-                        ldr_data_entry->InLoadOrderModuleList.Flink);
+                argos_logf("\n");
+                //argos_logf("Flink: 0x%08x \n",
+                //        *(target_ulong*)ldr_data_entry);
                 ldr_data_entry =
-                    (LDR_DATA_TABLE_ENTRY *)
-                    PHYS_ADDR(ldr_data_entry->InLoadOrderModuleList.Flink);
+                    PHYS_ADDR(*(target_ulong*)ldr_data_entry);
 
-                if ( (LIST_ENTRY*)ldr_data_entry == module_list )
+                if ( ldr_data_entry == module_list )
                 {
                     break;
                 }
@@ -925,9 +998,9 @@ static void _start_analysis_phase(CPUX86State * env)
 {
     env->shellcode_context.phase = ARGOS_TRACKSC_PHASE_ANALYZING;
 
-   // argos_logf("Dumping loaded modules for targeted process.\n");
-   // _get_imported_modules(env);
-   // argos_logf("Done dumping loaded modules for targeted process.\n");
+   argos_logf("Dumping loaded modules for targeted process.\n");
+   _get_imported_modules(env);
+   argos_logf("Done dumping loaded modules for targeted process.\n");
 }
 
 static void _start_tracking_phase(CPUX86State * env)
