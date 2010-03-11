@@ -52,7 +52,6 @@ static unsigned char _is_tracking(CPUX86State * env);
 static void _save_shellcode_context(CPUX86State * env);
 static void _start_analysis_phase(CPUX86State * env);
 static void _start_tracking_phase(CPUX86State * env);
-//static uint8_t _listed_imported_modules;
 extern void vm_stop(int reason);
 
 void argos_tracksc_init(CPUX86State * env)
@@ -73,15 +72,14 @@ void argos_tracksc_init(CPUX86State * env)
     env->shellcode_context.logfile = fopen(filename, "wb");
     if (!env->shellcode_context.logfile) 
     {
-        argos_logf("Failed to open the shellcode log file %s.\n", filename);
+        argos_logf("Failed to open the shellcode log file %s.\n",
+                filename);
         exit(1);
     }
     else
     {
         argos_logf("Opened shellcode log file %s.\n", filename);
     }
-
-   // _listed_imported_modules = 0;
 }
 
 void argos_tracksc_stop(CPUX86State * env)
@@ -94,8 +92,9 @@ void argos_tracksc_stop(CPUX86State * env)
         env->shellcode_context.phase = ARGOS_TRACKSC_PHASE_IDLE;
     }
 
-    argos_tracksc_imported_function * delete_cursor, * next;
-    next = env->shellcode_context.imported_functions;
+    // Clean-up existing imported modules information.
+    argos_tracksc_imported_modules * delete_cursor, * next;
+    next = env->shellcode_context.imported_modules;
     while ( next )
     {
         delete_cursor = next;
@@ -103,9 +102,6 @@ void argos_tracksc_stop(CPUX86State * env)
 
         if ( delete_cursor->module )
             free(delete_cursor->module);
-
-        if ( delete_cursor->function )
-            free(delete_cursor->function);
 
         free(delete_cursor);
     }
@@ -476,7 +472,7 @@ void argos_tracksc_check_function_call( CPUX86State * env)
 
         if ( !argos_dest_pc_isdirty(env, env->eip))
         {
-            if (  env->shellcode_context.imported_functions )
+            if (  env->shellcode_context.imported_modules )
             {
                 // Filter calls done in kernel-mode.
                 // TODO: Have to check for runtime flags /3GB and
@@ -485,35 +481,51 @@ void argos_tracksc_check_function_call( CPUX86State * env)
                 // addressing space.
                 if ( env->eip < 0x80000000 )
                 {
-                    argos_tracksc_imported_function * cursor =
-                        env->shellcode_context.imported_functions;
+                    argos_tracksc_imported_modules * cursor =
+                        env->shellcode_context.imported_modules;
                     while ( cursor != NULL )
                     {
-                        if ( cursor->address == env->eip )
+                        if ( cursor->module )
                         {
-                            if (cursor->function)
+                            if ( env->eip > cursor->module->begin_address
+                                    &&
+                                    env->eip < cursor->module->end_address)
                             {
-                                argos_logf("Called imported function %s\n",
-                                        cursor->function);
+                                char * module_name = (char*)
+                                    PHYS_ADDR(cursor->module->name +
+                                            cursor->module->begin_address);
+
+                                if (VALID_PTR(module_name))
+                                {
+                                    argos_logf(
+                                            "Called function from %s.\n"
+                                            , module_name);
+                                }
+                                else
+                                {
+                                    argos_logf(
+                                            "Called imported function.\n"
+                                            );
+                                }
+                                break;
                             }
-                            break;
                         }
-                        else
-                        {
-                            cursor = cursor->next;
-                        }
+                        cursor = cursor->next;
                     }
 
                     if ( cursor == NULL )
                     {
-                        argos_logf("Called unknown function at 0x%x\n", env->eip);
+                        argos_logf(
+                                "Called non-imported function at 0x%08x\n",
+                                env->eip);
                     }
                 }
             }
         }
         else
         {
-            argos_logf("Called injected function.\n");
+            argos_logf("Called injected function at 0x%08x.\n",
+                    env->eip);
         }
     }
 }
@@ -614,14 +626,19 @@ static void _get_imported_modules(CPUX86State * env)
         target_phys_addr_t ldr_data_entry =
             PHYS_ADDR(*(target_ulong*)module_list);
 
-        argos_logf("%10s\t%10s\t%s\n", "start:", "end:", "module:");
+        argos_tracksc_imported_modules * last_imported_entry = NULL;
+        argos_logf("%10s\t%10s\t%s\n", "begin:", "end:", "module:");
         while(1)
         {
+            target_ulong begin_addr, end_addr;
+            char module_basename[255];
+
             if ( VALID_PTR(ldr_data_entry) )
             {
                 target_ulong module_base =
                     *(target_ulong*)(ldr_data_entry + 0x18);
-                argos_logf("0x%08x", module_base);
+                //argos_logf("0x%08x", module_base);
+                begin_addr = module_base;
 
                 // _LDR_DATA_TABLE_ENTRY.BaseDllName.Length
                 uint16_t basename_length =
@@ -637,7 +654,7 @@ static void _get_imported_modules(CPUX86State * env)
                     {
                         // Converting utf16 to ascii, 
                         // the fast and incomplete way.
-                        argos_logf("\t");
+                        //argos_logf("\t");
                         uint16_t i;
                         for (i = 0; i < 256; i++)
                         {
@@ -647,11 +664,13 @@ static void _get_imported_modules(CPUX86State * env)
                                 if ( (c & 0xFF00) == 0 )
                                 {
                                     char dc = (c & 0xFF );
-                                    argos_logf("%c", dc);
+                                    //argos_logf("%c", dc);
+                                    module_basename[i] = dc;
                                 }
                             }
                             else
                             {
+                                module_basename[i] = '\0';
                                 break;
                             }
                         }
@@ -702,6 +721,11 @@ static void _get_imported_modules(CPUX86State * env)
                 target_ulong size_of_image =
                     *(target_ulong*)(pe_hdr + 0x50);
 
+                end_addr = begin_addr + size_of_image;
+
+                argos_logf("0x%08x\t0x%08x\t%s", begin_addr,
+                        end_addr, module_basename);
+
                 // IMAGE_OPTIONAL_HEADER.NumberOfRvaAndSizes
                 if ( *(target_ulong*)(pe_hdr + 0x74) == 0 )
                 {
@@ -723,50 +747,85 @@ static void _get_imported_modules(CPUX86State * env)
                     PHYS_ADDR(module_base + vir_addr_export_dir);
                 if (!VALID_PTR(export_dir))
                 {
-                    argos_logf("\t?");
+                    argos_logf("\tDeferred");
                     goto next_module;
                 }
+
+                // IMAGE_EXPORT_DIR.Name
+                target_ulong name =
+                    *(target_ulong*)(export_dir + 0xC);
+
+                // IMAGE_EXPORT_DIR.Base
+                target_ulong base =
+                    *(target_ulong*)(export_dir + 0x10);
 
                 // IMAGE_EXPORT_DIR.NumberOfFunctions
-                target_ulong numOfFunctions =
+                target_ulong nr_of_functions =
                     *(target_ulong*)(export_dir + 0x14);
-                argos_logf("\t%u", numOfFunctions);
+                argos_logf("\t%u", nr_of_functions);
+
+                // IMAGE_EXPORT_DIR.NumberOfNames
+                target_ulong nr_of_names =
+                    *(target_ulong*)(export_dir + 0x18);
 
                 // IMAGE_EXPORT_DIR.AddressOfFunctions
-                target_ulong addresses_rva =
+                target_ulong addrs_of_functions =
                    *(target_ulong*)(export_dir + 0x1C);
 
-                target_phys_addr_t addresses =
-                    PHYS_ADDR(module_base + addresses_rva);
-
-                if ( !VALID_PTR(addresses) )
-                {
-                    goto next_module;
-                }
-
-                // IMAGE_EXPORT_DIR.AddressOfFunctions
-                target_ulong names_rva =
+                // IMAGE_EXPORT_DIR.AddressOfNames
+                target_ulong addrs_of_names =
                    *(target_ulong*)(export_dir + 0x1C);
-
-                target_phys_addr_t names =
-                    PHYS_ADDR(module_base + names_rva);
-
-                if ( !VALID_PTR(names) )
-                {
-                    goto next_module;
-                }
 
                 // IMAGE_EXPORT_DIR.AddressOfNameOrdinals
-                target_ulong ordinals_rva =
+                target_ulong addrs_of_name_ordinals =
                    *(target_ulong*)(export_dir + 0x24);
 
-                target_phys_addr_t ordinals =
-                    PHYS_ADDR(module_base + ordinals);
+                argos_tracksc_imported_module * imported_module =
+                    (argos_tracksc_imported_module *)
+                    malloc(sizeof(argos_tracksc_imported_module));
 
-                if ( !VALID_PTR(ordinals) )
+                if ( imported_module == NULL)
                 {
-                    goto next_module;
+                    argos_logf("Unable to allocate memory for analysis!!");
+                    exit(1);
                 }
+
+                imported_module->name = name;
+                imported_module->begin_address = begin_addr;
+                imported_module->end_address = end_addr;
+                imported_module->nr_of_functions = nr_of_functions;
+                imported_module->nr_of_named_functions = nr_of_names;
+                imported_module->addr_of_functions = addrs_of_functions;
+                imported_module->addr_of_function_names =
+                    addrs_of_names;
+                imported_module->addr_of_name_ordinals =
+                    addrs_of_name_ordinals;
+                imported_module->base_ordinal = base;
+
+                argos_tracksc_imported_modules * imported_module_entry =
+                    (argos_tracksc_imported_modules *)
+                    malloc(sizeof(argos_tracksc_imported_modules));
+
+                if ( imported_module_entry == NULL)
+                {
+                    argos_logf("Unable to allocate memory for analysis!!");
+                    exit(1);
+                }
+
+                imported_module_entry->next = NULL;
+                imported_module_entry->module = imported_module;
+
+                if ( last_imported_entry )
+                {
+                    last_imported_entry =
+                        last_imported_entry->next = imported_module_entry;
+                }
+                else
+                {
+                    env->shellcode_context.imported_modules =
+                        last_imported_entry = imported_module_entry;
+                }
+
 next_module:
                 argos_logf("\n");
                 //argos_logf("Flink: 0x%08x \n",
