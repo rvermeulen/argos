@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Remco Vermeulen 
+/* Copyright (c) 2010, Remco Vermeulen 
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -49,6 +49,7 @@
 #define ARGOS_TRACKSC_PHASE_ANALYZING  0x2
 #define ARGOS_TRACKSC_PHASE_TRACKING   0x3
 
+/*
 typedef struct _argos_tracksc_imported_function
 {
     struct _argos_tracksc_imported_function * next;
@@ -57,6 +58,36 @@ typedef struct _argos_tracksc_imported_function
     target_ulong ordinal;
     target_ulong address;
 } argos_tracksc_imported_function;
+*/
+
+typedef struct _argos_tracksc_imported_module
+{
+    // RVA to the name of the module as defined in the export directory.
+    target_ulong name;
+    // Base address of the image, at this address the image is loaded.
+    target_ulong begin_address;
+    // The end address is the sum of the begin address and the size of
+    // the image.
+    target_ulong end_address;
+    // The number of exported functions.
+    target_ulong nr_of_functions;
+    // The number of exported functions with a name.
+    target_ulong nr_of_named_functions;
+    // RVA from base of the image.
+    target_ulong addr_of_functions;
+    // RVA from base of the image.
+    target_ulong addr_of_function_names;
+    // RVA from base of the image.
+    // The ordinals are relative to the base ordinal.
+    target_ulong addr_of_name_ordinals;
+    target_ulong base_ordinal;
+} argos_tracksc_imported_module;
+
+typedef struct _argos_tracksc_imported_modules
+{
+    struct _argos_tracksc_imported_modules * next;
+    argos_tracksc_imported_module * module;
+} argos_tracksc_imported_modules;
 
 // The argos shellcode context contains the context that is needed to
 // to track the execution of shellcode and the bytes referenced by
@@ -66,9 +97,10 @@ typedef struct _argos_tracksc_context
     // Is there an instance of shellcode running.
     unsigned phase;
     unsigned stop_condition;
-    // The value of the cr3 register at the moment code injection is detected.
-    // We use this to determine if the execution of tainted bytes belong to the
-    // process of which we are tracking the execution of shellcode.
+    // The value of the cr3 register at the moment code injection is
+    // detected.
+    // We use this to determine if the execution of tainted bytes belong
+    // to the process of which we are tracking the execution of shellcode.
     target_ulong cr3;
     target_ulong thread_id;
     // The following file pointer is used for internal debugging reasons.
@@ -77,8 +109,9 @@ typedef struct _argos_tracksc_context
     unsigned instruction_cnt;
     // Is the instruction pointed to by the eip a system call.
     char is_system_call;
-    // We use the current eip to check if memory references are related/performed
-    // to the instruction we are now logging, since we want to log those references.
+    // We use the current eip to check if memory references are
+    // related/performed to the instruction we are now logging,
+    // since we want to log those references.
     target_ulong loadedby_eip;
     target_ulong storedby_eip;
     target_ulong executed_eip;
@@ -114,6 +147,7 @@ typedef struct _argos_tracksc_context
     unsigned char store_addr_type;
     // Number of stored bytes
     unsigned store_size;
-    argos_tracksc_imported_function * imported_functions;
+//    argos_tracksc_imported_function * imported_functions;
+    argos_tracksc_imported_modules * imported_modules;
 } argos_shellcode_context_t;
 #endif
