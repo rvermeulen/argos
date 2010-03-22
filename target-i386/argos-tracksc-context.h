@@ -49,16 +49,19 @@
 #define ARGOS_TRACKSC_PHASE_ANALYZING  0x2
 #define ARGOS_TRACKSC_PHASE_TRACKING   0x3
 
-/*
-typedef struct _argos_tracksc_imported_function
+
+typedef struct _argos_tracksc_exported_function
 {
-    struct _argos_tracksc_imported_function * next;
-    char * module;
-    char * function;
+    const char * name;
     target_ulong ordinal;
     target_ulong address;
-} argos_tracksc_imported_function;
-*/
+} argos_tracksc_exported_function;
+
+typedef struct _argos_tracksc_exported_functions
+{
+    struct _argos_tracksc_exported_functions * next;
+    argos_tracksc_exported_function * function;
+} argos_tracksc_exported_functions;
 
 typedef struct _argos_tracksc_imported_module
 {
@@ -81,6 +84,7 @@ typedef struct _argos_tracksc_imported_module
     // The ordinals are relative to the base ordinal.
     target_ulong addr_of_name_ordinals;
     target_ulong base_ordinal;
+    argos_tracksc_exported_functions * exports;
 } argos_tracksc_imported_module;
 
 typedef struct _argos_tracksc_imported_modules
