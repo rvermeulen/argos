@@ -65,24 +65,23 @@ typedef struct _argos_tracksc_exported_functions
 
 typedef struct _argos_tracksc_imported_module
 {
-    // RVA to the name of the module as defined in the export directory.
-    target_ulong name;
+    char name[256];
     // Base address of the image, at this address the image is loaded.
     target_ulong begin_address;
     // The end address is the sum of the begin address and the size of
     // the image.
     target_ulong end_address;
     // The number of exported functions.
-    target_ulong nr_of_functions;
+    target_ulong number_of_functions;
     // The number of exported functions with a name.
-    target_ulong nr_of_named_functions;
+    target_ulong number_of_functions_with_names;
     // RVA from base of the image.
-    target_ulong addr_of_functions;
+    target_ulong function_address_table_rva;
     // RVA from base of the image.
-    target_ulong addr_of_function_names;
+    target_ulong function_name_table_rva;
     // RVA from base of the image.
     // The ordinals are relative to the base ordinal.
-    target_ulong addr_of_name_ordinals;
+    target_ulong function_ordinal_table_rva;
     target_ulong base_ordinal;
     argos_tracksc_exported_functions * exports;
 } argos_tracksc_imported_module;
