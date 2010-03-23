@@ -488,27 +488,17 @@ void argos_tracksc_check_function_call( CPUX86State * env)
                             if ( env->eip > cursor->module->begin_address
                                     && env->eip < cursor->module->end_address)
                             {
-                                char * module_name = (char*)
-                                    PHYS_ADDR(cursor->module->name +
-                                            cursor->module->begin_address);
-
-                                if ( !VALID_PTR(module_name) )
-                                {
-                                    argos_logf("Invalid pointer to module name!!!\n");
-                                    break;
-                                }
-
                                 target_ulong function_address_table =
                                     cursor->module->begin_address +
-                                    cursor->module->addr_of_functions;
+                                    cursor->module->function_address_table_rva;
 
                                 target_ulong function_ordinal_table =
                                     cursor->module->begin_address +
-                                    cursor->module->addr_of_name_ordinals;
+                                    cursor->module->function_ordinal_table_rva;
 
                                 target_ulong function_name_table =
                                     cursor->module->begin_address +
-                                    cursor->module->addr_of_function_names;
+                                    cursor->module->function_name_table_rva;
 
                                 if ( !VALID_PTR(function_name_table) )
                                 {
@@ -517,7 +507,7 @@ void argos_tracksc_check_function_call( CPUX86State * env)
                                 }
 
                                 unsigned i,j;
-                                for (i = 0; i < cursor->module->nr_of_functions; ++i)
+                                for (i = 0; i < cursor->module->number_of_functions; ++i)
                                 {
                                     target_ulong * function_address =
                                         (target_ulong *)PHYS_ADDR(function_address_table + i * sizeof(target_ulong));
@@ -530,7 +520,7 @@ void argos_tracksc_check_function_call( CPUX86State * env)
 
                                     if ( env->eip == (*function_address + cursor->module->begin_address) )
                                     {
-                                        for (j = 0; j < cursor->module->nr_of_functions; ++j)
+                                        for (j = 0; j < cursor->module->number_of_functions; ++j)
                                         {
                                             unsigned short * function_ordinal = (unsigned short *)
                                                 PHYS_ADDR(function_ordinal_table + j * sizeof(unsigned short));
@@ -543,7 +533,7 @@ void argos_tracksc_check_function_call( CPUX86State * env)
 
                                             if ( i == *function_ordinal )
                                             {
-                                                if ( j < cursor->module->nr_of_named_functions )
+                                                if ( j < cursor->module->number_of_functions_with_names )
                                                 {
                                                     target_ulong * function_name_rva =
                                                         (target_ulong *)PHYS_ADDR(function_name_table + j * sizeof(target_ulong));
@@ -561,7 +551,7 @@ void argos_tracksc_check_function_call( CPUX86State * env)
                                                     if ( VALID_PTR(function_name) )
                                                     {
                                                         argos_logf("Called %s from %s\n", function_name,
-                                                                module_name);
+                                                                cursor->module->name);
                                                     }
                                                     else
                                                     {
@@ -570,7 +560,8 @@ void argos_tracksc_check_function_call( CPUX86State * env)
                                                 }
                                                 else
                                                 {
-                                                    argos_logf("Called @%u from %s\n", *function_ordinal, module_name);
+                                                    argos_logf("Called @%u from %s\n", *function_ordinal,
+                                                            cursor->module->name);
                                                 }
                                                 break;
                                             }
@@ -646,6 +637,61 @@ static void _log_instr(argos_shellcode_context_t * context)
     }
 }
 
+static argos_tracksc_exported_functions * _get_exports_from_module(CPUX86State * env,
+        argos_tracksc_imported_module * module)
+{
+    argos_tracksc_exported_functions * exports =
+        (argos_tracksc_exported_functions *)
+        malloc(sizeof(argos_tracksc_exported_functions));
+
+    if ( exports == NULL )
+        return NULL;
+
+    memset(exports, 0, sizeof(argos_tracksc_exported_functions));
+
+    target_ulong function_address_table = module->function_address_table_rva
+        + module->begin_address;
+
+    target_ulong function_ordinal_table = module->function_ordinal_table_rva
+        + module->begin_address;
+
+    target_ulong function_name_table = module->function_name_table_rva
+        + module->begin_address;
+
+    unsigned i = 0;
+    for(; i < module->number_of_functions; ++i)
+    {
+        argos_tracksc_exported_function * export =
+            (argos_tracksc_exported_function *)
+            malloc(sizeof(argos_tracksc_exported_function));
+
+        if ( export == NULL )
+            continue;
+
+        memset(export, 0, sizeof(argos_tracksc_exported_function));
+
+        if ( i < module->number_of_functions_with_names )
+        {
+            target_ulong * function_name_rva = (target_ulong*)
+                PHYS_ADDR(function_name_table + i * sizeof(target_ulong));
+
+            if ( VALID_PTR(function_name_rva) )
+            {
+                char * function_name = (char *)PHYS_ADDR(*function_name_rva
+                        + module->begin_address);
+                if ( VALID_PTR(function_name) )
+                {
+                    export->name = strdup(function_name);
+                    argos_logf("%s\n", function_name);
+                }
+            }
+        }
+        else
+        {
+        }
+    }
+}
+
 static argos_tracksc_imported_module * _get_module(CPUX86State * env, target_ulong base_address)
 {
     // IMAGE_DOS_HEADER
@@ -695,10 +741,6 @@ static argos_tracksc_imported_module * _get_module(CPUX86State * env, target_ulo
         return NULL;
     }
 
-    // IMAGE_OPTIONAL_HEADER.DataDirectory[0].VirtualAddress
-    target_ulong vir_addr_export_dir =
-        *(target_ulong*)(pe_hdr + 0x78);
-
     argos_tracksc_imported_module * imported_module =
         (argos_tracksc_imported_module *)
         malloc(sizeof(argos_tracksc_imported_module));
@@ -712,63 +754,89 @@ static argos_tracksc_imported_module * _get_module(CPUX86State * env, target_ulo
     imported_module->begin_address = base_address;
     imported_module->end_address = end_address;
 
-    if ( vir_addr_export_dir != 0 )
-    {
-        target_phys_addr_t export_dir =
-            PHYS_ADDR(base_address + vir_addr_export_dir);
-        if (!VALID_PTR(export_dir))
-        {
-            argos_logf("Invalid pointer to export directory.\n");
-            free(imported_module);
-            return NULL;
-        }
+    // IMAGE_OPTIONAL_HEADER.DataDirectory[0].VirtualAddress
+    target_ulong export_directory_virtual_address =
+        *(target_ulong*)(pe_hdr + 0x78);
 
+    if ( export_directory_virtual_address != 0 )
+    {
         // IMAGE_EXPORT_DIR.Name
-        target_ulong name =
-            *(target_ulong*)(export_dir + 0xC);
+        target_ulong name_address =
+            *(target_ulong*)PHYS_ADDR(base_address
+                    + export_directory_virtual_address + 0xC);
+
+        char * name = (char *)PHYS_ADDR(base_address + name_address);
+        if ( VALID_PTR(name) )
+        {
+            strncpy(imported_module->name, name, 255);
+            imported_module->name[255] = '\0';
+        }
+        else
+        {
+            imported_module->name[0] = '\0';
+        }
 
         // IMAGE_EXPORT_DIR.Base
         target_ulong base =
-            *(target_ulong*)(export_dir + 0x10);
+            //*(target_ulong*)(export_dir + 0x10);
+            *(target_ulong*)PHYS_ADDR(base_address
+                    + export_directory_virtual_address + 0x10);
 
         // IMAGE_EXPORT_DIR.NumberOfFunctions
-        target_ulong nr_of_functions =
-            *(target_ulong*)(export_dir + 0x14);
+        target_ulong number_of_functions =
+            //*(target_ulong*)(export_dir + 0x14);
+            *(target_ulong*)PHYS_ADDR(base_address
+                    + export_directory_virtual_address + 0x14);
 
         // IMAGE_EXPORT_DIR.NumberOfNames
-        target_ulong nr_of_names =
-            *(target_ulong*)(export_dir + 0x18);
+        target_ulong number_of_functions_with_names =
+            //*(target_ulong*)(export_dir + 0x18);
+            *(target_ulong*)PHYS_ADDR(base_address
+                    + export_directory_virtual_address + 0x18);
 
         // IMAGE_EXPORT_DIR.AddressOfFunctions
-        target_ulong addrs_of_functions =
-            *(target_ulong*)(export_dir + 0x1C);
+        target_ulong function_address_table_rva =
+            //*(target_ulong*)(export_dir + 0x1C);
+            *(target_ulong*)PHYS_ADDR(base_address
+                    + export_directory_virtual_address + 0x1C);
 
         // IMAGE_EXPORT_DIR.AddressOfNames
-        target_ulong addrs_of_names =
-            *(target_ulong*)(export_dir + 0x1C);
+        target_ulong function_name_table_rva =
+            //*(target_ulong*)(export_dir + 0x1C);
+            *(target_ulong*)PHYS_ADDR(base_address
+                    + export_directory_virtual_address + 0x20);
 
         // IMAGE_EXPORT_DIR.AddressOfNameOrdinals
-        target_ulong addrs_of_name_ordinals =
-            *(target_ulong*)(export_dir + 0x24);
+        target_ulong function_ordinal_table_rva =
+            //*(target_ulong*)(export_dir + 0x24);
+            *(target_ulong*)PHYS_ADDR(base_address
+                    + export_directory_virtual_address + 0x24);
 
-        imported_module->name = name;
-        imported_module->nr_of_functions = nr_of_functions;
-        imported_module->nr_of_named_functions = nr_of_names;
-        imported_module->addr_of_functions = addrs_of_functions;
-        imported_module->addr_of_function_names =
-            addrs_of_names;
-        imported_module->addr_of_name_ordinals =
-            addrs_of_name_ordinals;
+        imported_module->number_of_functions = number_of_functions;
+        imported_module->number_of_functions_with_names = number_of_functions_with_names;
+        imported_module->function_address_table_rva = function_address_table_rva;
+        imported_module->function_name_table_rva = function_name_table_rva;
+        imported_module->function_ordinal_table_rva = function_ordinal_table_rva;
         imported_module->base_ordinal = base;
+
+        argos_logf("%s: 0x%08x 0x%08x 0x%08x 0x%08x 0x%08x %04u %04u\n",
+                imported_module->name,
+                base_address,
+                function_address_table_rva, function_ordinal_table_rva, function_name_table_rva,
+                end_address,
+                number_of_functions,
+                number_of_functions_with_names);
+
+        //_get_exports_from_module(env, imported_module);
     }
     else
     {
-        imported_module->name = 0;
-        imported_module->nr_of_functions = 0;
-        imported_module->nr_of_named_functions = 0;
-        imported_module->addr_of_functions = 0;
-        imported_module->addr_of_function_names = 0;
-        imported_module->addr_of_name_ordinals = 0;
+        imported_module->name[0] = '\0';
+        imported_module->number_of_functions = 0;
+        imported_module->number_of_functions_with_names = 0;
+        imported_module->function_address_table_rva = 0;
+        imported_module->function_name_table_rva = 0;
+        imported_module->function_ordinal_table_rva = 0;
         imported_module->base_ordinal = 0;
     }
 
@@ -848,7 +916,7 @@ static void _get_imported_modules(CPUX86State * env)
             PHYS_ADDR(*(target_ulong*)module_list);
 
         argos_tracksc_imported_modules * last_imported_entry = NULL;
-        argos_logf("%10s\t%10s\t%50s\t%5s\n", "begin:", "end:", "module:", "exports:");
+        //argos_logf("%10s\t%10s\t%50s\t%5s\n", "begin:", "end:", "module:", "exports:");
 
         while(1)
         {
@@ -909,9 +977,9 @@ static void _get_imported_modules(CPUX86State * env)
                         last_imported_entry = imported_module_entry;
                 }
 
-                argos_logf("0x%010u\t0x%010u\t%30s\t%5u\n", module_base,
+                /*argos_logf("0x%010u\t0x%010u\t%30s\t%5u\n", module_base,
                         imported_module->end_address, module_basename,
-                        imported_module->nr_of_functions);
+                        imported_module->number_of_functions);*/
 
 next_module:
                 ldr_data_entry =
