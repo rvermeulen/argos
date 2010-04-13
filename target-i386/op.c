@@ -725,6 +725,7 @@ void OPPROTO op_argos_jmp_T0(void)
     old_pc = EIP + env->segs[R_CS].base;
     EIP = T0;
     ARGOS_CHECK(T0TAG, old_pc, ARGOS_ALERT_JMP);
+    argos_tracksc_check_function_call(env);
 }
 
 void OPPROTO op_argos_call_jmp_T0(void)
