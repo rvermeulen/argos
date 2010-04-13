@@ -8285,12 +8285,10 @@ static int main_loop(void)
                 ti = profile_getclock();
 #endif
                 ret = cpu_exec(env);
+                //argos_tracksc_check_for_invalid_system_call(env);
 #ifdef CONFIG_PROFILER
                 qemu_time += profile_getclock() - ti;
 #endif
-                // Check whether as system call is performed during 
-                // the tracking of shell-code.
-                argos_tracksc_check_for_invalid_system_call(env);
 
                 next_cpu = env->next_cpu ?: first_cpu;
                 if (event_pending) {
@@ -8327,14 +8325,14 @@ static int main_loop(void)
             }
             if (ret == EXCP_DEBUG) 
             {
-                if ( argos_tracksc_is_active(env) )
-                {
-                    argos_tracksc_log_instruction(env);
-                }
-                else
-                {
+                //if ( argos_tracksc_is_tracking(env) )
+                //{
+                //    argos_tracksc_after_instruction_execution(env);
+                //}
+                //else
+                //{
                     vm_stop(EXCP_DEBUG);
-                }
+                //}
             }
             /* If all cpus are halted then wait until the next IRQ */
             /* XXX: use timeout computed from timers */
@@ -9616,11 +9614,20 @@ int main(int argc, char **argv)
 	    case QEMU_OPTION_tracksc:
 		if (!argos_fsc)
 		{
+                    if ( argos_os_hint == 2 )
+                    {
 			argos_tracksc = 1;
+                        fprintf(stderr, "Shell-code tracking is enabled, make sure that the page file is disabled!!!\n");
+                    }
+                    else
+                    {
+                        fprintf(stderr, "Shell-code tracking is currently only available for Windows XP!\n");
+                        exit(1);
+                    }
 		}
 		else
 		{
-			fprintf(stderr, "Can only track shellcode if using -no-fsc.\n");
+			fprintf(stderr, "Shell-code tracking is only available when forensic shellcode is disabled (-no-fsc)!\n");
 			exit(1);
 		}
 		break;
