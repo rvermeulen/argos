@@ -62,12 +62,6 @@ typedef struct _argos_tracksc_exported_function
     target_ulong address;
 } argos_tracksc_exported_function;
 
-/*typedef struct _argos_tracksc_exported_function_list_entry
-{
-    struct _argos_tracksc_exported_function_list_entry * next;
-    argos_tracksc_exported_function * function;
-} argos_tracksc_exported_function_list_entry;*/
-
 typedef struct _argos_tracksc_imported_module
 {
     char name[ARGOS_MAX_PATH];
@@ -88,15 +82,8 @@ typedef struct _argos_tracksc_imported_module
     // The ordinals are relative to the base ordinal.
     target_ulong function_ordinal_table_rva;
     target_ulong base_ordinal;
-    //argos_tracksc_exported_function_list_entry * exports;
     slist_entry * exports;
 } argos_tracksc_imported_module;
-
-/*typedef struct _argos_tracksc_imported_module_list_entry
-{
-    struct _argos_tracksc_imported_module_list_entry * next;
-    argos_tracksc_imported_module * module;
-} argos_tracksc_imported_module_list_entry;*/
 
 // The argos shellcode context contains the context that is needed to
 // to track the execution of shellcode and the bytes referenced by
@@ -124,10 +111,6 @@ typedef struct _argos_tracksc_context
     target_ulong loadedby_eip;
     target_ulong storedby_eip;
     target_ulong executed_eip;
-    // Buffer containing the executed bytes
-    //char instruction[MAX_INSTRUCTION_SIZE];
-    // Size of the instruction
-    //unsigned short instruction_size;
     INSTRUCTION instruction;
     // Did we logged something.
     unsigned logged;
@@ -157,8 +140,13 @@ typedef struct _argos_tracksc_context
     unsigned char store_addr_type;
     // Number of stored bytes
     unsigned store_size;
-    //argos_tracksc_imported_function * imported_functions;
-    //argos_tracksc_imported_module_list_entry * imported_modules;
     slist_entry * imported_modules;
+    // Array of the different LoadLibrary functions that can be used to load libraries
+    // at run-time. Often used by shell-code to get access to functionality.
+    // 0: LoadLibraryA
+    // 1: LoadLibraryW
+    // 2: LoadLibraryExA
+    // 3: LoadLibraryExW
+    argos_tracksc_exported_function * load_library_functions[4];
 } argos_shellcode_context_t;
 #endif
