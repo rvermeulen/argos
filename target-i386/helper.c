@@ -2794,11 +2794,11 @@ void helper_lret_protected(int shift, int addend)
 
 void helper_sysenter(void)
 {
-
-    if (!argos_tracksc_is_valid_system_call(env))
-    {
-        cpu_loop_exit();
-    }
+    argos_tracksc_is_valid_system_call(env);
+    //if (!argos_tracksc_is_valid_system_call(env))
+    //{
+    //    cpu_loop_exit();
+    //}
 
     if (env->sysenter_cs == 0) {
         raise_exception_err(EXCP0D_GPF, 0);
