@@ -700,8 +700,18 @@ int cpu_exec(CPUState *env1)
                 fp.gp = code_gen_buffer + 2 * (1 << 20);
                 (*(void (*)(void)) &fp)();
 #else
-                argos_tracksc_store_context(env);
+                if (argos_tracksc_is_tracking(env))
+                {
+                    argos_tracksc_before_instruction_execution(env);
+                }
+
                 gen_func();
+
+                if (argos_tracksc_is_tracking(env))
+                {
+                    argos_tracksc_after_instruction_execution(env);
+                }
+
 #endif
                 env->current_tb = NULL;
                 /* reset soft MMU for next block (it can currently
@@ -728,11 +738,12 @@ int cpu_exec(CPUState *env1)
             env_to_regs();
 
             /* Take care of the int 2E or sysenter system call before it is
-             * called */
-            if ( argos_tracksc_logged_invalid_system_call(env) )
+             * executing the target code. */
+            argos_tracksc_after_instruction_raised_an_exception(env);
+            /*if ( argos_tracksc_logged_invalid_system_call(env) )
             {
                 break;
-            }
+            }*/
         }
     } /* for(;;) */
 
