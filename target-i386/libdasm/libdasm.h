@@ -16,6 +16,7 @@
 extern "C" {
 #endif
 
+
 #define __LIBDASM_VERSION__     0x01050000
 
 #define GET_VERSION_MAJOR  \
@@ -60,6 +61,7 @@ typedef int32_t   SDWORD;
 typedef int64_t   SQWORD;
 #endif
 
+#ifdef _LIBDASM_INTERNALS
 // Define endianess
 
 #ifndef __X86__
@@ -159,6 +161,7 @@ typedef int64_t   SQWORD;
 #define REGISTER_TYPE_MMX       7
 #define REGISTER_TYPE_FPU       8
 
+#endif // _LIBDASM_INTERNALS
 // Disassembling mode
 enum Mode {
 	MODE_32,	// 32-bit
@@ -171,6 +174,7 @@ enum Format {
 	FORMAT_INTEL,
 };
 
+#ifdef _LIBDASM_INTERNALS
 // Process eflags
 #define EFL_CF         (1 <<  0)
 #define EFL_PF         (1 <<  2)
@@ -184,6 +188,8 @@ enum Format {
 #define EFL_MATH       EFL_OF|EFL_SF|EFL_ZF|EFL_AF|EFL_PF|EFL_CF
 #define EFL_BITWISE    EFL_OF|EFL_CF|EFL_SF|EFL_ZF|EFL_PF
 #define EFL_ALL_COMMON EFL_CF|EFL_OF|EFL_SF|EFL_ZF|EFL_AF|EFL_PF
+
+#endif // _LIBDASM_INTERNALS
 
 // Instruction types (just the most common ones atm)
 enum Instruction {
@@ -440,7 +446,7 @@ POPERAND get_destination_operand(
 	PINSTRUCTION inst
 );
 
-
+#ifdef _LIBDASM_INTERNALS
 // Instruction flags (prefixes)
 
 // Group 1
@@ -579,6 +585,7 @@ POPERAND get_destination_operand(
 #define MASK_SIB_INDEX(x) MASK_MODRM_REG(x)
 #define MASK_SIB_BASE(x)  MASK_MODRM_RM(x)
 
+#endif // _LIBDASM_INTERNALS
 
 #ifdef __cplusplus
 }

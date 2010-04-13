@@ -11,7 +11,9 @@
 
 #include <stdio.h>
 #include <string.h>
+#define _LIBDASM_INTERNALS
 #include "libdasm.h"
+#undef _LIBDASM_INTERNALS
 #include "opcode_tables.h"
 
 
