@@ -106,3 +106,8 @@ unsigned slist_is_tail(slist_entry * entry)
 {
     return entry->next == NULL;
 }
+
+unsigned slist_contains_data(slist_entry * entry)
+{
+    return entry->data != NULL;
+}

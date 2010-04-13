@@ -22,4 +22,5 @@ slist_entry* slist_tail(slist_entry * head);
 void slist_set_data(slist_entry * entry, void * data);
 void * slist_get_data(slist_entry * entry);
 unsigned slist_is_tail(slist_entry * entry);
+unsigned slist_contains_data(slist_entry * entry);
 #endif
