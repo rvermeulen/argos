@@ -49,6 +49,11 @@
 #define ARGOS_TRACKSC_PHASE_ANALYZING  0x2
 #define ARGOS_TRACKSC_PHASE_TRACKING   0x3
 
+// Documentated at http://msdn.microsoft.com/en-us/library/aa365247%28VS.85%29.aspx
+#define ARGOS_MAX_PATH 260
+
+#include "libdasm/libdasm.h"
+#include "argos-utility.h"
 
 typedef struct _argos_tracksc_exported_function
 {
@@ -57,15 +62,15 @@ typedef struct _argos_tracksc_exported_function
     target_ulong address;
 } argos_tracksc_exported_function;
 
-typedef struct _argos_tracksc_exported_functions
+/*typedef struct _argos_tracksc_exported_function_list_entry
 {
-    struct _argos_tracksc_exported_functions * next;
+    struct _argos_tracksc_exported_function_list_entry * next;
     argos_tracksc_exported_function * function;
-} argos_tracksc_exported_functions;
+} argos_tracksc_exported_function_list_entry;*/
 
 typedef struct _argos_tracksc_imported_module
 {
-    char name[256];
+    char name[ARGOS_MAX_PATH];
     // Base address of the image, at this address the image is loaded.
     target_ulong begin_address;
     // The end address is the sum of the begin address and the size of
@@ -83,14 +88,15 @@ typedef struct _argos_tracksc_imported_module
     // The ordinals are relative to the base ordinal.
     target_ulong function_ordinal_table_rva;
     target_ulong base_ordinal;
-    argos_tracksc_exported_functions * exports;
+    //argos_tracksc_exported_function_list_entry * exports;
+    slist_entry * exports;
 } argos_tracksc_imported_module;
 
-typedef struct _argos_tracksc_imported_modules
+/*typedef struct _argos_tracksc_imported_module_list_entry
 {
-    struct _argos_tracksc_imported_modules * next;
+    struct _argos_tracksc_imported_module_list_entry * next;
     argos_tracksc_imported_module * module;
-} argos_tracksc_imported_modules;
+} argos_tracksc_imported_module_list_entry;*/
 
 // The argos shellcode context contains the context that is needed to
 // to track the execution of shellcode and the bytes referenced by
@@ -119,9 +125,10 @@ typedef struct _argos_tracksc_context
     target_ulong storedby_eip;
     target_ulong executed_eip;
     // Buffer containing the executed bytes
-    char instruction[MAX_INSTRUCTION_SIZE];
+    //char instruction[MAX_INSTRUCTION_SIZE];
     // Size of the instruction
-    unsigned short instruction_size;
+    //unsigned short instruction_size;
+    INSTRUCTION instruction;
     // Did we logged something.
     unsigned logged;
 #ifdef ARGOS_NET_TRACKER
@@ -150,7 +157,8 @@ typedef struct _argos_tracksc_context
     unsigned char store_addr_type;
     // Number of stored bytes
     unsigned store_size;
-//    argos_tracksc_imported_function * imported_functions;
-    argos_tracksc_imported_modules * imported_modules;
+    //argos_tracksc_imported_function * imported_functions;
+    //argos_tracksc_imported_module_list_entry * imported_modules;
+    slist_entry * imported_modules;
 } argos_shellcode_context_t;
 #endif
