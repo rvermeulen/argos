@@ -6894,6 +6894,15 @@ static inline int gen_intermediate_code_internal(CPUState *env,
         /* stop translation if indicated */
         if (dc->is_jmp)
             break;
+
+        /* If we are tracking shell-code, we generate only on instruction. */
+        if ( argos_tracksc_is_tracking(env) )
+        {
+            gen_jmp_im(pc_ptr - dc->cs_base);
+            gen_eob(dc);
+            break;
+        }
+
         /* if single step mode, we generate only one instruction and
            generate an exception */
         /* if irq were inhibited with HF_INHIBIT_IRQ_MASK, we clear
