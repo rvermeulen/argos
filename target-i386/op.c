@@ -678,30 +678,30 @@ void OPPROTO op_andl_A0_ffff(void)
 #ifdef TARGET_X86_64
 void OPPROTO op_argos_save_EIP_im(void)
 {
-	env->eip = PARAMQ1;
+    env->eip = PARAMQ1;
 }
 
 void OPPROTO op_argos_save_FPIP_im(void)
 {
-	env->prev_fpip = env->fpip;
-	env->fpip = PARAMQ1;
+    env->prev_fpip = env->fpip;
+    env->fpip = PARAMQ1;
 }
 #else
 void OPPROTO op_argos_save_EIP_im(void)
 {
-	env->eip = PARAM1;
+    env->eip = PARAM1;
 }
 void OPPROTO op_argos_save_FPIP_im(void)
 {
-	env->prev_fpip = env->fpip;
-	env->fpip = PARAM1;
+    env->prev_fpip = env->fpip;
+    env->fpip = PARAM1;
 }
 #endif
 void OPPROTO op_argos_switch_FPIP(void)
 {
-	target_ulong temp = env->fpip;
-	env->fpip = env->prev_fpip;
-	env->prev_fpip = temp;
+    target_ulong temp = env->fpip;
+    env->fpip = env->prev_fpip;
+    env->prev_fpip = temp;
 }
 
 /* indirect jump */
@@ -725,6 +725,7 @@ void OPPROTO op_argos_jmp_T0(void)
     old_pc = EIP + env->segs[R_CS].base;
     EIP = T0;
     ARGOS_CHECK(T0TAG, old_pc, ARGOS_ALERT_JMP);
+    argos_tracksc_check_for_return(env);
     argos_tracksc_check_function_call(env);
 }
 
@@ -746,6 +747,7 @@ void OPPROTO op_argos_ret_jmp_T0(void)
     old_pc = EIP + env->segs[R_CS].base;
     EIP = T0;
     ARGOS_CHECK(T0TAG, old_pc, ARGOS_ALERT_RET);
+    argos_tracksc_check_for_return(env);
 }
 
 #ifdef TARGET_X86_64

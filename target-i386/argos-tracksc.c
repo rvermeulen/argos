@@ -28,7 +28,8 @@ static argos_tracksc_exported_function * find_exported_function(argos_tracksc_im
 static argos_tracksc_exported_function * find_exported_function_by_name(CPUX86State * env, const char * name);
 static slist_entry * get_exports_from_module(CPUX86State * env, argos_tracksc_imported_module * module);
 static unsigned get_load_library_functions(CPUX86State * env);
-static unsigned is_loading_library_call(CPUX86State * env, target_ulong callee_address);
+static argos_tracksc_exported_function * is_loading_library_call(CPUX86State * env, target_ulong callee_address);
+static void save_return_address(CPUX86State * env);
 extern void vm_stop(int reason);
 
 target_phys_addr_t phys_addr(CPUX86State *env, target_ulong addr)
@@ -100,18 +101,6 @@ void argos_tracksc_stop(CPUX86State * env)
     }
 
     // Clean-up existing imported modules information.
-    /*argos_tracksc_imported_module_list_entry * delete_cursor, * next;
-    next = env->shellcode_context.imported_modules;
-    while ( next )
-    {
-        delete_cursor = next;
-        next = delete_cursor->next;
-
-        if ( delete_cursor->module )
-            free(delete_cursor->module);
-
-        free(delete_cursor);
-    }*/
     slist_destroy(env->shellcode_context.imported_modules, free);
 }
 
@@ -540,6 +529,10 @@ void argos_tracksc_check_function_call( CPUX86State * env)
                         argos_logf("Could not find called module!\n");
                     }
                 }
+                else
+                {
+                    save_return_address(env);
+                }
             }
         }
         else
@@ -548,7 +541,7 @@ void argos_tracksc_check_function_call( CPUX86State * env)
                     env->eip);
         }
     }
- 
+
     if (sigprocmask(SIG_UNBLOCK, &alrmset, NULL) != 0)
         perror("could not unblock temporarily blocked signals");
 }
@@ -689,7 +682,7 @@ static slist_entry * get_exports_from_module(CPUX86State * env, argos_tracksc_im
                         {
                             export->name = NULL;
 
-                            argos_logf("Found %s@%u\n", module->name, export->ordinal);
+                            //argos_logf("Found %s@%u\n", module->name, export->ordinal);
 
                             if ( tail )
                             {
@@ -1235,7 +1228,10 @@ static unsigned get_load_library_functions(CPUX86State * env)
     return found_functions;
 }
 
-static unsigned is_loading_library_call(CPUX86State * env, target_ulong callee_address)
+// Returns a pointer to the argos_tracksc_exported_function
+// struct of the LoadLibrary function called.
+// NULL if no function from the LoadLibrary family is called.
+static argos_tracksc_exported_function * is_loading_library_call(CPUX86State * env, target_ulong callee_address)
 {
     unsigned i = 0;
     for(; i < 4; ++i)
@@ -1257,7 +1253,7 @@ static unsigned is_loading_library_call(CPUX86State * env, target_ulong callee_a
                                 argos_logf("Shell-code is loading the library %s\n", library);
                             }
                         }
-                        break;
+                        return function;
                     }
                 case 1:
                 case 3:
@@ -1275,17 +1271,73 @@ static unsigned is_loading_library_call(CPUX86State * env, target_ulong callee_a
                                 }
                             }
                         }
-                        break;
+                        return function;
                     }
-                    break;
                 default:
                     argos_logf("Internal inconsistancy detected, exiting Argos!!!");
                     exit(1);
                     break;
             }
-
-            return 1;
         }
     }
-    return 0;
+    return NULL;
+}
+
+// This function assumes that the top of the stack points to the return address.
+static void save_return_address(CPUX86State * env)
+{
+    target_ulong * return_address = (target_ulong *)PHYS_ADDR(env->regs[R_ESP]);
+    if ( return_address )
+    {
+        env->shellcode_context.saved_return_address = *return_address;
+    }
+    else
+    {
+        env->shellcode_context.saved_return_address = 0;
+    }
+}
+
+// Here we save the content of the eax register when the eip equals the
+// value of the saved return address.
+void argos_tracksc_check_for_return(CPUX86State * env)
+{
+    if ( env->shellcode_context.saved_return_address != 0
+            && env->shellcode_context.saved_return_address == env->eip )
+    {
+        env->shellcode_context.saved_return_value = env->regs[R_EAX];
+        argos_tracksc_imported_module * loaded_module = get_module(env, env->regs[R_EAX]);
+        if ( loaded_module )
+        {
+            argos_logf("Loaded %s\n", loaded_module->name);
+            if (env->shellcode_context.imported_modules)
+            {
+                slist_entry * tail = slist_add_after(env->shellcode_context.imported_modules, loaded_module);
+                if (!tail)
+                {
+                    argos_logf("Unable to allocate memory for analysis!!");
+                    exit(1);
+                }
+            }
+            else
+            {
+                slist_entry * head = slist_create();
+                if ( head )
+                {
+                    slist_set_data(head, loaded_module);
+                    env->shellcode_context.imported_modules = head;
+                }
+                else
+                {
+                    argos_logf("Unable to allocate memory for analysis!!");
+                    exit(1);
+                }
+            }
+        }
+        else
+        {
+            argos_logf("Loaded module is not a valid library!\n");
+        }
+
+        env->shellcode_context.saved_return_address = 0;
+    }
 }

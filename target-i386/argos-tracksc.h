@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Remco Vermeulen 
+/* Copyright (c) 2010, Remco Vermeulen 
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -44,6 +44,7 @@ int argos_tracksc_is_valid_system_call(CPUX86State * env);
 void argos_tracksc_check_function_call( CPUX86State * env);
 unsigned char argos_tracksc_is_idle( CPUX86State * env);
 unsigned char argos_tracksc_is_tracking( CPUX86State * env);
+void argos_tracksc_check_for_return(CPUX86State * env);
 
 #define ARGOS_TRACKSC_IS_TRACKING env->shellcode_context.phase \
     == ARGOS_TRACKSC_PHASE_TRACKING

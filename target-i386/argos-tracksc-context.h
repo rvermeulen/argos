@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, Remco Vermeulen 
+/* Copyright (c) 2010, Remco Vermeulen
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -148,5 +148,10 @@ typedef struct _argos_tracksc_context
     // 2: LoadLibraryExA
     // 3: LoadLibraryExW
     argos_tracksc_exported_function * load_library_functions[4];
+    // Containing the return value of a call ( the content of the eax register ), when requested.
+    target_ulong saved_return_value;
+    // Since mutiple returns can be nested in a function call we use the return address to 
+    // check if a function call returns.
+    target_ulong saved_return_address;
 } argos_shellcode_context_t;
 #endif
