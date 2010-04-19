@@ -112,6 +112,7 @@ typedef struct _argos_tracksc_context
     target_ulong storedby_eip;
     target_ulong executed_eip;
     INSTRUCTION instruction;
+    unsigned char instruction_bytes[MAX_INSTRUCTION_SIZE];
     // Did we logged something.
     unsigned logged;
 #ifdef ARGOS_NET_TRACKER
@@ -153,5 +154,8 @@ typedef struct _argos_tracksc_context
     // Since mutiple returns can be nested in a function call we use the return address to 
     // check if a function call returns.
     target_ulong saved_return_address;
+    // This variable holds the number of calls made without a return.
+    // A call level, which is higher than 1, indicates nested calls.
+    target_ulong call_level;
 } argos_shellcode_context_t;
 #endif
