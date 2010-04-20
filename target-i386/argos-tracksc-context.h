@@ -74,13 +74,9 @@ typedef struct _argos_tracksc_imported_module
     target_ulong number_of_functions;
     // The number of exported functions with a name.
     target_ulong number_of_functions_with_names;
-    // RVA from base of the image.
-    target_ulong function_address_table_rva;
-    // RVA from base of the image.
-    target_ulong function_name_table_rva;
-    // RVA from base of the image.
-    // The ordinals are relative to the base ordinal.
-    target_ulong function_ordinal_table_rva;
+    target_ulong function_address_table;
+    target_ulong function_name_table;
+    target_ulong function_ordinal_table;
     target_ulong base_ordinal;
     slist_entry * exports;
 } argos_tracksc_imported_module;
