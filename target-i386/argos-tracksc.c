@@ -33,30 +33,31 @@ static argos_tracksc_exported_function * is_loading_library_call(CPUX86State * e
 static void save_return_address(CPUX86State * env);
 extern void vm_stop(int reason);
 
-target_phys_addr_t phys_addr(CPUX86State *env, target_ulong addr)
+target_phys_addr_t translate_address(CPUX86State *env, target_ulong address)
 {
-    target_phys_addr_t paddr =
-        cpu_get_phys_page_debug(env, addr + env->segs[R_CS].base);
-    if (paddr != -1)
+    target_phys_addr_t physical_page =
+        cpu_get_phys_page_debug(env, address + env->segs[R_CS].base);
+    if (physical_page != -1)
     {
-        PhysPageDesc *pdesc = phys_page_find(paddr >> TARGET_PAGE_BITS);
-        unsigned long pd;
-        if (!pdesc) {
-            pd = IO_MEM_UNASSIGNED;
-        } else {
-            pd = pdesc->phys_offset;
-        }
-        unsigned long phys_addr = (unsigned long)phys_ram_base
-            + (pd & TARGET_PAGE_MASK) + (addr & ~TARGET_PAGE_MASK);
+       uint32_t offset = cpu_get_physical_page_desc(physical_page);
+       if ( offset != IO_MEM_UNASSIGNED )
+       {
+           target_phys_addr_t phys_addr = (target_phys_addr_t)phys_ram_base
+               + ( offset & TARGET_PAGE_MASK) + (address & ~TARGET_PAGE_MASK);
 
-        return phys_addr;
+           return phys_addr;
+       }
+       else
+       {
+           return 0;
+       }
     }
     else
     {
         return 0;
     }
 }
-#define PHYS_ADDR(X) phys_addr(env, (X))
+#define PHYS_ADDR(X) translate_address(env, (X))
 
 void argos_tracksc_init(CPUX86State * env)
 {
@@ -468,10 +469,16 @@ void argos_tracksc_check_function_call( CPUX86State * env)
                                     argos_logf("Called %s!%s\n", module->name, function->name);
                                 }
                             }
+                            else
+                            {
+                                // TODO: search for the function in the module.
+                                argos_logf("Unknown function, system calls we be blocked!!!");
+                            }
                         }
                         else
                         {
-                            argos_logf("Could not find called module!\n");
+                            argos_logf("Shellcode called unknown function. Stopping Argos!!!");
+                            exit(1);
                         }
                     }
                     else
@@ -674,29 +681,29 @@ static slist_entry * get_exports_from_module(CPUX86State * env, argos_tracksc_im
                             else
                             {
                                 free(export);
-                                argos_logf("Invalid address of function name!!!\n");
-                                address_translation_failure(address_of_function_name);
+                                //argos_logf("Invalid address of function name!!!\n");
+                                //address_translation_failure(address_of_function_name);
                             }
                         }
                         else
                         {
                             free(export);
-                            argos_logf("Invalid address of function name rva!!!\n");
-                            address_translation_failure(address_of_function_name_rva);
+                            //argos_logf("Invalid address of function name rva!!!\n");
+                            //address_translation_failure(address_of_function_name_rva);
                         }
                     }
                     else
                     {
                         free(export);
-                        argos_logf("Invalid address of function address!!!\n");
-                        address_translation_failure(address_of_function_address);
+                        //argos_logf("Invalid address of function address!!!\n");
+                        //address_translation_failure(address_of_function_address);
                     }
                 }
                 else
                 {
                     free(export);
-                    argos_logf("Invalid address of function ordinal!!!\n");
-                    address_translation_failure(address_of_function_ordinal);
+                    //argos_logf("Invalid address of function ordinal!!!\n");
+                    //address_translation_failure(address_of_function_ordinal);
                 }
             }
             else
@@ -935,41 +942,52 @@ static uint32_t utf16_to_utf8(uint16_t * source, uint32_t source_length,
 
 static void get_imported_modules(CPUX86State * env)
 {
-    target_ulong address_of_teb = env->segs[R_FS].base;
+    target_ulong teb = env->segs[R_FS].base;
 
-    target_phys_addr_t teb = PHYS_ADDR(address_of_teb);
-    if (!teb)
+    target_ulong address_of_pointer_to_peb = (teb + TEB_PROCESS_ENVIRONMENT_BLOCK);
+    target_ulong * pointer_to_peb = (target_ulong*) PHYS_ADDR(address_of_pointer_to_peb);
+
+    if (!pointer_to_peb)
     {
-        argos_logf("Invalid pointer to teb: 0x%016lx\n", teb);
-        address_translation_failure(address_of_teb);
+        argos_logf("Invalid pointer to peb!!!\n");
+        address_translation_failure(address_of_pointer_to_peb);
     }
 
-    target_ulong address_of_peb = *((target_ulong*) (teb + TEB_PROCESS_ENVIRONMENT_BLOCK));
+    target_ulong peb = *pointer_to_peb;
 
-    target_phys_addr_t peb = PHYS_ADDR(address_of_peb);
-    if (!peb)
+    target_ulong address_of_pointer_to_loader_data = peb + PEB_LOADER_DATA;
+    target_ulong * pointer_to_loader_data = (target_ulong*) PHYS_ADDR(address_of_pointer_to_loader_data);
+
+    if (!pointer_to_loader_data)
     {
-        argos_logf("Invalid pointer to peb: 0x%016lx\n", teb);
-        address_translation_failure(address_of_peb);
+        argos_logf("Invalid address of pointer to peb loader data!!!\n");
+        address_translation_failure(address_of_pointer_to_loader_data);
     }
 
-    target_ulong address_of_loader_data = *((target_ulong*)(peb + PEB_LOADER_DATA));
+    target_ulong loader_data = *pointer_to_loader_data;
 
-    target_phys_addr_t loader_data = PHYS_ADDR(address_of_loader_data);
-    if (!loader_data)
+    target_ulong address_of_is_initialized = loader_data + PEB_LDR_DATA_INITIALIZED;
+    uint8_t * initialized = (uint8_t*) PHYS_ADDR(address_of_is_initialized);
+
+    if ( !initialized )
     {
-        argos_logf("Invalid pointer to LdrData: 0x%016lx\n", loader_data);
-        address_translation_failure(address_of_loader_data);
+        argos_logf("Invalid address of is initialized loader data!!!\n");
+        address_translation_failure(address_of_is_initialized);
     }
 
-    uint8_t initialized = *((uint8_t*)loader_data + PEB_LDR_DATA_INITIALIZED);
-
-    if ( initialized )
+    if ( *initialized )
     {
-        target_phys_addr_t module_list = loader_data + PEB_LDR_DATA_IN_LOAD_ORDER_MODULE_LIST;
+        target_ulong module_list = loader_data + PEB_LDR_DATA_IN_LOAD_ORDER_MODULE_LIST;
 
-        target_ulong address_of_loader_data_entry = *(target_ulong*)module_list;
-        target_phys_addr_t loader_data_entry = PHYS_ADDR(address_of_loader_data_entry);
+        target_ulong * pointer_to_loader_data_entry = (target_ulong*) PHYS_ADDR(module_list + LIST_ENTRY_FLINK);
+
+        if ( !pointer_to_loader_data_entry )
+        {
+            argos_logf("Invalid address to pointer of loader data entry!!!\n");
+            address_translation_failure(module_list);
+        }
+
+        target_ulong loader_data_entry = *pointer_to_loader_data_entry;
 
         slist_entry * tail = NULL;
 
@@ -977,77 +995,95 @@ static void get_imported_modules(CPUX86State * env)
         {
             char module_basename[ARGOS_MAX_PATH];
 
-            if ( loader_data_entry )
+            target_ulong address_of_module_base = loader_data_entry + LDR_MODULE_BASE_ADDRESS;
+            target_ulong * module_base = (target_ulong*) PHYS_ADDR(address_of_module_base);
+
+            if ( !module_base )
             {
-                target_ulong module_base = *(target_ulong*)(loader_data_entry + LDR_MODULE_BASE_ADDRESS);
+                argos_logf("Invalid address of module base!!!\n");
+                address_translation_failure(address_of_module_base);
+            }
 
-                uint16_t module_base_dll_name_length = (*(uint16_t*)(loader_data_entry + LDR_MODULE_BASE_DLL_NAME + UNICODE_STRING_LENGTH)) / sizeof(uint16_t);
-                if ( module_base_dll_name_length > 0 && module_base_dll_name_length < ARGOS_MAX_PATH )
+            target_ulong address_of_module_base_dll_name_length = loader_data_entry + LDR_MODULE_BASE_DLL_NAME + UNICODE_STRING_LENGTH;
+            uint16_t * module_base_dll_name_length = (uint16_t*) PHYS_ADDR(address_of_module_base_dll_name_length);
+
+            if ( !module_base_dll_name_length )
+            {
+                argos_logf("Invalid address of module base dll name length!!!\n");
+                address_translation_failure(address_of_module_base_dll_name_length);
+            }
+
+            uint16_t module_base_dll_name_length_in_characters = *module_base_dll_name_length / sizeof(uint16_t);
+
+            if ( module_base_dll_name_length_in_characters > 0 && module_base_dll_name_length_in_characters < ARGOS_MAX_PATH )
+            {
+                target_ulong address_of_pointer_to_module_base_dll_name = (loader_data_entry + LDR_MODULE_BASE_DLL_NAME + UNICODE_STRING_BUFFER);
+                target_ulong * address_of_module_base_dll_name = (target_ulong*) PHYS_ADDR(address_of_pointer_to_module_base_dll_name);
+
+                if ( !address_of_module_base_dll_name )
                 {
-                    target_ulong address_of_module_base_dll_name = *(target_ulong*)(loader_data_entry + LDR_MODULE_BASE_DLL_NAME + UNICODE_STRING_BUFFER);
-                    uint16_t * module_base_dll_name = (uint16_t *)PHYS_ADDR( address_of_module_base_dll_name  );
-
-                    if ( module_base_dll_name )
-                    {
-                        utf16_to_utf8(module_base_dll_name, module_base_dll_name_length, module_basename, sizeof(module_basename));
-                    }
-                    else
-                    {
-                        argos_logf("Invalid address of loader module base dll name!!!\n");
-                        address_translation_failure(address_of_module_base_dll_name);
-                    }
+                    argos_logf("Invalid address of pointer to module base dll name!!!\n");
+                    address_translation_failure(address_of_pointer_to_module_base_dll_name);
                 }
 
-                argos_tracksc_imported_module * imported_module = get_module(env, module_base);
+                uint16_t * module_base_dll_name = (uint16_t *) PHYS_ADDR( *address_of_module_base_dll_name  );
 
-                if ( imported_module == NULL )
+                if ( module_base_dll_name )
                 {
-                    goto next_module;
-                }
-
-                if ( tail )
-                {
-                    tail = slist_add_after(tail, imported_module);
-                    if ( !tail )
-                    {
-                        argos_logf("Unable to allocate memory for analysis!!");
-                        exit(1);
-                    }
+                    utf16_to_utf8(module_base_dll_name, module_base_dll_name_length_in_characters, module_basename, sizeof(module_basename));
                 }
                 else
                 {
-                    slist_entry * head = slist_create();
-                    if ( head )
-                    {
-                        slist_set_data(head, imported_module);
-                        env->shellcode_context.imported_modules = tail = head;
-                    }
-                    else
-                    {
-                        argos_logf("Unable to allocate memory for analysis!!");
-                        exit(1);
-                    }
+                    argos_logf("Invalid address of loader module base dll name!!!\n");
+                    address_translation_failure(*address_of_module_base_dll_name);
                 }
-next_module:
-                address_of_loader_data_entry = *(target_ulong*)loader_data_entry + LIST_ENTRY_FLINK;
-                loader_data_entry = PHYS_ADDR(address_of_loader_data_entry);
+            }
 
-                if ( !loader_data_entry )
-                {
-                    argos_logf("Invalid loader data entry!!!\n");
-                    address_translation_failure(address_of_loader_data_entry);
-                }
+            argos_tracksc_imported_module * imported_module = get_module(env, *module_base);
 
-                // If we are back at the beginning of the list, we are done.
-                if ( loader_data_entry == module_list )
+            if ( imported_module == NULL )
+            {
+                goto next_module;
+            }
+
+            if ( tail )
+            {
+                tail = slist_add_after(tail, imported_module);
+                if ( !tail )
                 {
-                    break;
+                    argos_logf("Unable to allocate memory for analysis!!");
+                    exit(1);
                 }
             }
             else
             {
-                argos_logf("Invalid loader data entry!!!\n");
-                address_translation_failure(address_of_loader_data_entry);
+                slist_entry * head = slist_create();
+                if ( head )
+                {
+                    slist_set_data(head, imported_module);
+                    env->shellcode_context.imported_modules = tail = head;
+                }
+                else
+                {
+                    argos_logf("Unable to allocate memory for analysis!!");
+                    exit(1);
+                }
+            }
+next_module:
+            pointer_to_loader_data_entry = (target_ulong*) PHYS_ADDR(loader_data_entry + LIST_ENTRY_FLINK);
+
+            if ( !pointer_to_loader_data_entry )
+            {
+                argos_logf("Invalid address to pointer of loader data entry!!!\n");
+                address_translation_failure(module_list);
+            }
+
+            loader_data_entry = *pointer_to_loader_data_entry;
+
+            // If we are back at the beginning of the list, we are done.
+            if ( loader_data_entry == module_list )
+            {
+                break;
             }
         }
     }
