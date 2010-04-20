@@ -602,14 +602,9 @@ static void write_instruction_to_log(argos_shellcode_context_t * context)
 
 static slist_entry * get_exports_from_module(CPUX86State * env, argos_tracksc_imported_module * module)
 {
-    target_ulong function_address_table = module->function_address_table_rva
-        + module->begin_address;
-
-    target_ulong function_ordinal_table = module->function_ordinal_table_rva
-        + module->begin_address;
-
-    target_ulong function_name_table = module->function_name_table_rva
-        + module->begin_address;
+    target_ulong function_address_table = module->function_address_table;
+    target_ulong function_ordinal_table = module->function_ordinal_table;
+    target_ulong function_name_table = module->function_name_table;
 
     slist_entry * head = NULL, * tail = NULL;
 
@@ -898,9 +893,9 @@ static argos_tracksc_imported_module * get_module(CPUX86State * env, target_ulon
 
         imported_module->number_of_functions = *number_of_functions;
         imported_module->number_of_functions_with_names = *number_of_functions_with_names;
-        imported_module->function_address_table_rva = *function_address_table_rva;
-        imported_module->function_name_table_rva = *function_name_table_rva;
-        imported_module->function_ordinal_table_rva = *function_ordinal_table_rva;
+        imported_module->function_address_table = *function_address_table_rva + imported_module->begin_address;
+        imported_module->function_name_table = *function_name_table_rva + imported_module->begin_address;
+        imported_module->function_ordinal_table = *function_ordinal_table_rva + imported_module->begin_address;
         imported_module->base_ordinal = *module_base_ordinal;
         imported_module->exports = get_exports_from_module(env, imported_module);
 
