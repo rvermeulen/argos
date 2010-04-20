@@ -123,10 +123,10 @@ int inet_aton(const char *cp, struct in_addr *ia);
 #include "qemu_socket.h"
 #include "argos-tag.h"
 #ifdef ARGOS_WHITELIST
-# include "argos-whitelist.h"
-
-# define DEFAULT_WHITELIST_FILE "/etc/argos-whitelist"
+#include "argos-whitelist.h"
+#define DEFAULT_WHITELIST_FILE "/etc/argos-whitelist"
 #endif
+#include "target-i386/argos-tracksc-whitelist.h"
 
 #ifdef CONFIG_SDL
 #ifdef __APPLE__
@@ -263,6 +263,7 @@ int argos_fsc = 1;
 int argos_instance_id = 0;
 char *argos_wprofile = NULL;
 int argos_tracksc = 0;
+const char * argos_tracksc_whitelist = NULL;
 #ifdef ARGOS_NET_TRACKER
 FILE *argos_nt_fl = NULL;
 #endif
@@ -8465,6 +8466,7 @@ static void help(int exitcode)
            "-no-csilog      do not generate an argos log when an attack is detected\n"
            "-no-fsc         do not inject forensics shellcode after an attack is detected\n"
            "-tracksc        *EXPERIMENTAL* tracks and logs shellcode after an attack is detected\n"
+           "-tracksc-whitelist Provide a whitelist of function that may be executed by shell-code\n"
 #ifdef ARGOS_WHITELIST
            "-wp profile     set the whitelist OS to profile\n"
 #endif
@@ -8623,6 +8625,7 @@ enum {
     QEMU_OPTION_cs_laddr,
     QEMU_OPTION_cs_lport,
     QEMU_OPTION_tracksc,
+    QEMU_OPTION_tracksc_whitelist,
 };
 
 typedef struct QEMUOption {
@@ -8741,7 +8744,8 @@ const QEMUOption qemu_options[] = {
     { "vnc", HAS_ARG, QEMU_OPTION_vnc },
     { "csaddr", HAS_ARG, QEMU_OPTION_cs_laddr },
     { "csport", HAS_ARG, QEMU_OPTION_cs_lport },
-	{ "tracksc", 0, QEMU_OPTION_tracksc },
+    { "tracksc", 0, QEMU_OPTION_tracksc },
+    { "tracksc-whitelist", HAS_ARG, QEMU_OPTION_tracksc_whitelist },
 
     { NULL },
 };
@@ -9631,7 +9635,17 @@ int main(int argc, char **argv)
 			exit(1);
 		}
 		break;
-	    }
+            case QEMU_OPTION_tracksc_whitelist:
+                if ( argos_tracksc )
+                {
+                    argos_tracksc_whitelist = optarg;
+                }
+                else
+                {
+                    fprintf(stderr, "Shell-code tracking is not enabled before defining the tracksc whitelist, ignoring tracksc-whitelist\n");
+                }
+                break;
+            }
         }
     }
 
@@ -9804,18 +9818,23 @@ int main(int argc, char **argv)
     read_argos_whitelist(argos_wprofile, DEFAULT_WHITELIST_FILE);
 #endif
 
+    if ( argos_tracksc_whitelist && !argos_tracksc_read_whitelist(argos_tracksc_whitelist) )
+    {
+        fprintf(stderr, "Could not read tracksc whitelist %s\n", argos_tracksc_whitelist);
+        exit(1);
+    }
     // ARGOS
     srand(time(NULL));
-	argos_instance_id = random();
+    argos_instance_id = random();
     if (!(argos_memmap = argos_memmap_createz(phys_ram_size))) {
         fprintf(stderr, "Could not allocate argos memory map\n");
         exit(1);
     }
 #ifdef ARGOS_NET_TRACKER
     if (!(argos_nt_fl = fopen("argos.netlog", "wb"))) {
-	    fprintf(stderr, "Could not create net tracker log file"
-			    " argos.netlog\n");
-	    exit(1);
+        fprintf(stderr, "Could not create net tracker log file"
+                " argos.netlog\n");
+        exit(1);
     }
 #endif
 
