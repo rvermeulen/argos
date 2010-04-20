@@ -34,6 +34,7 @@
 extern int argos_csilog;
 extern int argos_fsc;
 extern int argos_tracksc;
+extern const char * argos_tracksc_whitelist;
 // Every run we create an unique id to identify this run.
 // This id is used for the generation of log files.
 extern int argos_instance_id;
