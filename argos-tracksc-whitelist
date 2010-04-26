@@ -1,11 +1,11 @@
 # This whitelist contains the modules and the functions exported by the module
 # that are allowed to execute.
-[kernel32]
+[kernel32.dll]
 LoadLibraryA
 LoadLibraryExA
 LoadLibraryW
 LoadLibraryExW
-[ws2_32]
+[ws2_32.dll]
 WSAStartup
 WSASocketA
 bind
