@@ -263,7 +263,8 @@ int argos_fsc = 1;
 int argos_instance_id = 0;
 char *argos_wprofile = NULL;
 int argos_tracksc = 0;
-const char * argos_tracksc_whitelist = NULL;
+const char * argos_tracksc_whitelist_path = NULL;
+slist_entry * argos_tracksc_whitelist = NULL;
 #ifdef ARGOS_NET_TRACKER
 FILE *argos_nt_fl = NULL;
 #endif
@@ -9638,7 +9639,7 @@ int main(int argc, char **argv)
             case QEMU_OPTION_tracksc_whitelist:
                 if ( argos_tracksc )
                 {
-                    argos_tracksc_whitelist = optarg;
+                    argos_tracksc_whitelist_path = optarg;
                 }
                 else
                 {
@@ -9774,9 +9775,9 @@ int main(int argc, char **argv)
     /* XXX: this should be moved in the PC machine instantiation code */
     if (net_boot != 0) {
         int netroms = 0;
-	for (i = 0; i < nb_nics && i < 4; i++) {
-	    const char *model = nd_table[i].model;
-	    char buf[1024];
+        for (i = 0; i < nb_nics && i < 4; i++) {
+            const char *model = nd_table[i].model;
+            char buf[1024];
             if (net_boot & (1 << i)) {
                 if (model == NULL)
                     model = "ne2k_pci";
@@ -9791,11 +9792,11 @@ int main(int argc, char **argv)
                     netroms++;
                 }
             }
-	}
-	if (netroms == 0) {
-	    fprintf(stderr, "No valid PXE rom found for network device\n");
-	    exit(1);
-	}
+        }
+        if (netroms == 0) {
+            fprintf(stderr, "No valid PXE rom found for network device\n");
+            exit(1);
+        }
     }
 #endif
 
@@ -9813,17 +9814,21 @@ int main(int argc, char **argv)
         exit(1);
     }
 
+    // ARGOS
 #ifdef ARGOS_WHITELIST
     init_argos_whitelist();
     read_argos_whitelist(argos_wprofile, DEFAULT_WHITELIST_FILE);
 #endif
 
-    if ( argos_tracksc_whitelist && !argos_tracksc_read_whitelist(argos_tracksc_whitelist) )
+    if ( argos_tracksc_whitelist_path )
     {
-        fprintf(stderr, "Could not read tracksc whitelist %s\n", argos_tracksc_whitelist);
-        exit(1);
+        argos_tracksc_whitelist = argos_tracksc_read_whitelist(argos_tracksc_whitelist_path);
+        if ( !argos_tracksc_whitelist )
+        {
+            fprintf(stderr, "Could not read tracksc whitelist %s\n", argos_tracksc_whitelist_path);
+            exit(1);
+        }
     }
-    // ARGOS
     srand(time(NULL));
     argos_instance_id = random();
     if (!(argos_memmap = argos_memmap_createz(phys_ram_size))) {
@@ -9859,7 +9864,7 @@ int main(int argc, char **argv)
 
     for(i = 0; i < nb_drives_opt; i++)
         if (drive_init(drives_opt[i], snapshot, machine) == -1)
-	    exit(1);
+            exit(1);
 
     register_savevm("timer", 0, 2, timer_save, timer_load, NULL);
     register_savevm("ram", 0, 2, ram_save, ram_load, NULL);
@@ -9977,34 +9982,34 @@ int main(int argc, char **argv)
     }
 
     if (daemonize) {
-	uint8_t status = 0;
-	ssize_t len;
-	int fd;
+        uint8_t status = 0;
+        ssize_t len;
+        int fd;
 
-    again1:
-	len = write(fds[1], &status, 1);
-	if (len == -1 && (errno == EINTR))
-	    goto again1;
+again1:
+        len = write(fds[1], &status, 1);
+        if (len == -1 && (errno == EINTR))
+            goto again1;
 
-	if (len != 1)
-	    exit(1);
+        if (len != 1)
+            exit(1);
 
-	TFR(fd = open("/dev/null", O_RDWR));
-	if (fd == -1)
-	    exit(1);
+        TFR(fd = open("/dev/null", O_RDWR));
+        if (fd == -1)
+            exit(1);
 
-	dup2(fd, 0);
-	dup2(fd, 1);
-	dup2(fd, 2);
+        dup2(fd, 0);
+        dup2(fd, 1);
+        dup2(fd, 2);
 
-	close(fd);
+        close(fd);
     }
 
     main_loop();
     quit_timers();
 
     if (ctrlsock_laddr)
-	    control_socket_cleanup();
+        control_socket_cleanup();
 
 #if !defined(_WIN32)
     /* close network clients */
