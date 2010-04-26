@@ -11,6 +11,7 @@
 #include "../exec-all.h"
 #include "libdasm/libdasm.h"
 #include "winxp/internals.h"
+#include "argos-tracksc-whitelist.h"
 #include "argos-tracksc.h"
 
 static void get_instruction_at_program_counter(CPUX86State * env);
@@ -450,42 +451,65 @@ void argos_tracksc_check_function_call( CPUX86State * env)
             // We are only interested in user-mode functions calls.
             if ( env->eip < 0x80000000 )
             {
-                if ( env->shellcode_context.call_level == 0 )
+                if (argos_tracksc_whitelist)
                 {
-                    // Raise call-level to 1 for calls made by the shell-code
-                    // to external functions
-                    env->shellcode_context.call_level++;
-                    save_return_address(env);
-                    if (!is_loading_library_call(env, env->eip))
+                    if ( env->shellcode_context.call_level == 0 )
                     {
-                        argos_tracksc_imported_module * module = find_module(env, env->eip);
-                        if ( module )
+                        // Raise call-level to 1 for calls made by the shell-code
+                        // to external functions
+                        env->shellcode_context.call_level++;
+                        save_return_address(env);
+                        if (!is_loading_library_call(env, env->eip))
                         {
-                            argos_tracksc_exported_function * function = find_exported_function(module, env->eip);
-                            if ( function )
+                            argos_tracksc_imported_module * module = find_module(env, env->eip);
+                            if ( module )
                             {
-                                if ( function->name )
+                                argos_tracksc_whitelist_entry * whitelist_entry = argos_tracksc_find_module_in_whitelist(module->name, argos_tracksc_whitelist);
+
+                                if ( whitelist_entry )
                                 {
-                                    argos_logf("Called %s!%s\n", module->name, function->name);
+                                    argos_tracksc_exported_function * function = find_exported_function(module, env->eip);
+                                    if ( function )
+                                    {
+                                        if ( function->name )
+                                        {
+                                            if ( argos_tracksc_whitelist_function_in_whitelist_entry(function->name, whitelist_entry) )
+                                            {
+                                                argos_logf("Called whitelisted %s!%s\n", module->name, function->name);
+                                            }
+                                            else
+                                            {
+                                                argos_logf("Called %s!%s\n", module->name, function->name);
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // TODO: search for the function in the module.
+                                        argos_logf("Unknown function, system calls we be blocked!!!");
+                                    }
+                                }
+                                else
+                                {
+                                    argos_logf("The module %s is not in the whitelist\n", module->name);
                                 }
                             }
                             else
                             {
-                                // TODO: search for the function in the module.
-                                argos_logf("Unknown function, system calls we be blocked!!!");
+                                argos_logf("Shellcode called unknown function. Stopping Argos!!!");
+                                exit(1);
                             }
                         }
                         else
                         {
-                            argos_logf("Shellcode called unknown function. Stopping Argos!!!");
-                            exit(1);
+                            // Raise call-level to 2 for LoadLibrary calls.
+                            env->shellcode_context.call_level++;
                         }
                     }
-                    else
-                    {
-                        // Raise call-level to 2 for LoadLibrary calls.
-                        env->shellcode_context.call_level++;
-                    }
+                }
+                else
+                {
+                    argos_logf("No whitelist specified!!!\n");
                 }
             }
         }
