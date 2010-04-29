@@ -13,6 +13,7 @@
 void skip_comment(FILE * file);
 int read_module_name(FILE * file, char * buffer, int max_number_of_characters_in_buffer);
 int read_function_name(FILE * file, char * buffer, int max_number_of_characters_in_buffer);
+void whitelist_deleter(void * whitelist_entry);
 
 slist_entry * argos_tracksc_read_whitelist(const char * whitelist_path)
 {
@@ -276,4 +277,15 @@ int argos_tracksc_whitelist_function_in_whitelist_entry(const char * function_na
     }
 
     return 0;
+}
+
+void argos_tracksc_destroy_whitelist(slist_entry * whitelist)
+{
+    slist_destroy(whitelist, whitelist_deleter);
+}
+
+void whitelist_deleter(void * whitelist_entry)
+{
+    free(((argos_tracksc_whitelist_entry*)whitelist_entry)->module_name);
+    slist_destroy(((argos_tracksc_whitelist_entry*)whitelist_entry)->functions, free);
 }
