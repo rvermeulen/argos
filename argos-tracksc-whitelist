@@ -10,4 +10,5 @@ WSAStartup
 WSASocketA
 bind
 listen
-accept
+# Black list accept to stop there.
+# accept
