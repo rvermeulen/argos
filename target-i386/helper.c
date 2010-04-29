@@ -1345,17 +1345,6 @@ void raise_interrupt(int intno, int is_int, int error_code,
         intno = check_exception(intno, &error_code);
     }
 
-    /* 
-       Windows 2000 uses the interrupt 2E to make system calls.
-       Newer operating systems however uses the instruction sysenter.
-       */
-    if ( intno == 0x2E)
-    {
-        // Because this is an interrupt we don't have to check the return
-        // value because, since there is no alternative path of execution.
-        argos_tracksc_is_valid_system_call(env);
-    }
-
     env->exception_index = intno;
     env->error_code = error_code;
     env->exception_is_int = is_int;
@@ -2794,12 +2783,6 @@ void helper_lret_protected(int shift, int addend)
 
 void helper_sysenter(void)
 {
-    argos_tracksc_is_valid_system_call(env);
-    //if (!argos_tracksc_is_valid_system_call(env))
-    //{
-    //    cpu_loop_exit();
-    //}
-
     if (env->sysenter_cs == 0) {
         raise_exception_err(EXCP0D_GPF, 0);
     }
