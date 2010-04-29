@@ -99,8 +99,6 @@ typedef struct _argos_tracksc_context
     FILE* logfile;
     // The number of shell-code instructions executed.
     unsigned instruction_cnt;
-    // Is the instruction pointed to by the eip a system call.
-    char is_system_call;
     // We use the current eip to check if memory references are
     // related/performed to the instruction we are now logging,
     // since we want to log those references.

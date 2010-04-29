@@ -32,6 +32,9 @@ static slist_entry * get_exports_from_module(CPUX86State * env, argos_tracksc_im
 static unsigned get_load_library_functions(CPUX86State * env);
 static argos_tracksc_exported_function * is_loading_library_call(CPUX86State * env, target_ulong callee_address);
 static void save_return_address(CPUX86State * env);
+static void imported_module_deleter(void * imported_module);
+static void export_deleter(void * export);
+static void exit_argos(CPUX86State * env);
 extern void vm_stop(int reason);
 
 target_phys_addr_t translate_address(CPUX86State *env, target_ulong address)
@@ -99,7 +102,12 @@ void argos_tracksc_stop(CPUX86State * env)
     }
 
     // Clean-up existing imported modules information.
-    slist_destroy(env->shellcode_context.imported_modules, free);
+    slist_destroy(env->shellcode_context.imported_modules, imported_module_deleter);
+
+    if ( argos_tracksc_whitelist )
+    {
+        argos_tracksc_destroy_whitelist(argos_tracksc_whitelist);
+    }
 }
 
 unsigned char argos_tracksc_is_idle( CPUX86State * env)
@@ -213,15 +221,15 @@ void argos_tracksc_log_instruction(CPUX86State * env)
         write_instruction_to_log(&env->shellcode_context);
 
         fprintf(env->shellcode_context.logfile, "\t");
-        //fprintf(env->shellcode_context.logfile, " ");
+        fprintf(env->shellcode_context.logfile, " ");
 
         // Print the bytes of the instruction
-        /*for (i = 0; i < env->shellcode_context.instruction.length; i++)
+        for (i = 0; i < env->shellcode_context.instruction.length; i++)
         {
             fprintf(env->shellcode_context.logfile, "%x ",
-                    env->shellcode_context.instruction[i] & 0xFF);
+                    env->shellcode_context.instruction_bytes[i] & 0xFF);
         }
-        fprintf(env->shellcode_context.logfile, "\t");*/
+        fprintf(env->shellcode_context.logfile, "\t");
 
 #ifdef ARGOS_NET_TRACKER
         // Print the netidx's of the instruction bytes.
@@ -382,58 +390,9 @@ void argos_tracksc_log_instruction(CPUX86State * env)
         {
             env->shellcode_context.phase = ARGOS_TRACKSC_PHASE_IDLE;
             // For now we just pause the vm.
-            vm_stop(0);
+            //vm_stop(0);
+            exit_argos(env);
         }
-    }
-}
-
-void argos_tracksc_check_for_invalid_system_call(CPUX86State * env)
-{
-    if ( env->shellcode_context.is_system_call)
-    {
-        // Check the shell-code tracking stop condition.
-        if ( env->shellcode_context.stop_condition ==
-                SSC_FIRST_SYSTEM_CALL )
-        {
-            env->shellcode_context.is_system_call = 0;
-            env->shellcode_context.phase = ARGOS_TRACKSC_PHASE_IDLE;
-            // The system call number resides in the register eax for the
-            // int 0x2e as well for the sysenter system call mechanism.
-            fprintf(env->shellcode_context.logfile,
-                    "Prevented shellcode from calling system call 0x%x.\n",
-                    env->regs[R_EAX]);
-
-            // For now we just pause the vm.
-            vm_stop(0);
-        }
-    }
-}
-
-int argos_tracksc_is_valid_system_call(CPUX86State * env)
-{
-    // If we are in the correct context.
-    if (argos_tracksc_is_tracking(env) && in_shellcode_context(env))
-    {
-        //argos_logf("The shellcode is trying to make a system call.\n");
-        // Flag that a system call is pending.
-        env->shellcode_context.is_system_call = 1;
-        return 0;
-    }
-    else
-    {
-        return 1;
-    }
-}
-
-int argos_tracksc_logged_invalid_system_call(CPUX86State * env)
-{
-    if ( argos_tracksc_is_tracking(env) )
-    {
-        return env->shellcode_context.is_system_call;
-    }
-    else
-    {
-        return 0;
     }
 }
 
@@ -459,64 +418,69 @@ void argos_tracksc_check_function_call( CPUX86State * env)
                         // to external functions
                         env->shellcode_context.call_level++;
                         save_return_address(env);
-                        if (!is_loading_library_call(env, env->eip))
-                        {
-                            argos_tracksc_imported_module * module = find_module(env, env->eip);
-                            if ( module )
-                            {
-                                argos_tracksc_whitelist_entry * whitelist_entry = argos_tracksc_find_module_in_whitelist(module->name, argos_tracksc_whitelist);
 
-                                if ( whitelist_entry )
+                        argos_tracksc_imported_module * module = find_module(env, env->eip);
+                        if ( module )
+                        {
+                            argos_tracksc_whitelist_entry * whitelist_entry = argos_tracksc_find_module_in_whitelist(module->name, argos_tracksc_whitelist);
+
+                            if ( whitelist_entry )
+                            {
+                                argos_tracksc_exported_function * function = find_exported_function(module, env->eip);
+                                if ( function )
                                 {
-                                    argos_tracksc_exported_function * function = find_exported_function(module, env->eip);
-                                    if ( function )
+                                    if ( function->name )
                                     {
-                                        if ( function->name )
+                                        if ( argos_tracksc_whitelist_function_in_whitelist_entry(function->name, whitelist_entry) )
                                         {
-                                            if ( argos_tracksc_whitelist_function_in_whitelist_entry(function->name, whitelist_entry) )
+                                            //argos_logf("Called whitelisted %s!%s\n", module->name, function->name);
+                                            if (is_loading_library_call(env, env->eip))
                                             {
-                                                argos_logf("Called whitelisted %s!%s\n", module->name, function->name);
-                                            }
-                                            else
-                                            {
-                                                argos_logf("Called %s!%s\n", module->name, function->name);
+                                                // Raise call-level to 2 for LoadLibrary calls.
+                                                env->shellcode_context.call_level++;
                                             }
                                         }
-                                    }
-                                    else
-                                    {
-                                        // TODO: search for the function in the module.
-                                        argos_logf("Unknown function, system calls we be blocked!!!");
+                                        else
+                                        {
+                                            argos_logf("Called blacklisted function %s!%s\n", module->name, function->name);
+                                            //vm_stop(0);
+                                            exit_argos(env);
+                                        }
                                     }
                                 }
                                 else
                                 {
-                                    argos_logf("The module %s is not in the whitelist\n", module->name);
+                                    argos_logf("Shell-code is calling unknown function in module %s, stopping Argos...\n", module->name);
+                                    //vm_stop(0);
+                                    exit_argos(env);
                                 }
                             }
                             else
                             {
-                                argos_logf("Shellcode called unknown function. Stopping Argos!!!");
-                                exit(1);
+                                argos_logf("Shell-code is calling black-listed module %s, stopping Argos...\n", module->name);
+                                //vm_stop(0);
+                                exit_argos(env);
                             }
                         }
                         else
                         {
-                            // Raise call-level to 2 for LoadLibrary calls.
-                            env->shellcode_context.call_level++;
+                            argos_logf("Shell-code is calling function in an unknown module, stopping Argos...\n");
+                            //vm_stop(0);
+                            exit_argos(env);
                         }
                     }
                 }
                 else
                 {
-                    argos_logf("No whitelist specified!!!\n");
+                    argos_logf("No whitelist specified and the shell-code is making an external call, stopping Argos...\n");
+                    exit_argos(env);
                 }
             }
         }
-        else
+        /*else
         {
             argos_logf("Called injected function at 0x%08x.\n", env->eip);
-        }
+        }*/
     }
 
     if (sigprocmask(SIG_UNBLOCK, &alrmset, NULL) != 0)
@@ -843,7 +807,7 @@ static argos_tracksc_imported_module * get_module(CPUX86State * env, target_ulon
             const char * module_name = (const char *)PHYS_ADDR( address_of_module_name );
             if ( module_name )
             {
-                argos_logf("Analysis module: %s\n", module_name);
+                argos_logf("Analyzing module: %s\n", module_name);
                 strncpy(imported_module->name, module_name, ARGOS_MAX_PATH);
                 imported_module->name[ARGOS_MAX_PATH-1] = '\0';
             }
@@ -1202,7 +1166,7 @@ static argos_tracksc_exported_function * find_exported_function_by_name(CPUX86St
         argos_tracksc_imported_module * module = (argos_tracksc_imported_module *)slist_get_data(module_cursor);
         if ( module )
         {
-            argos_logf("Searching %s for %s.\n", module->name, name);
+            //argos_logf("Searching %s for %s.\n", module->name, name);
             slist_entry * export_cursor = module->exports;
             while ( export_cursor )
             {
@@ -1396,4 +1360,22 @@ void argos_tracksc_check_for_return(CPUX86State * env)
 
     if (sigprocmask(SIG_UNBLOCK, &alrmset, NULL) != 0)
         perror("could not unblock temporarily blocked signals");
+}
+
+static void imported_module_deleter(void * imported_module)
+{
+    slist_destroy(((argos_tracksc_imported_module *) imported_module)->exports, export_deleter);
+    free(imported_module);
+}
+
+static void export_deleter(void * export)
+{
+    free(((argos_tracksc_exported_function *)export)->name);
+    free(export);
+}
+
+static void exit_argos(CPUX86State * env)
+{
+    argos_tracksc_stop(env);
+    exit(0);
 }
