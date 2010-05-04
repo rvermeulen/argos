@@ -32,13 +32,12 @@
 #ifndef ARGOS_TRACKSC_CONTEXT_H
 #define ARGOS_TRACKSC_CONTEXT_H
 
-#define MAX_INSTRUCTION_CNT 100
-#define MAX_INSTRUCTION_SIZE 17
-#define MAX_ADDRESSABLE_BYTES 8
+#define ARGOS_MAX_INSTRUCTION_COUNT 100
+#define ARGOS_MAX_INSTRUCTION_SIZE 17
 
 // Shellcode stop conditions
-#define SSC_MAX_INSTR_CNT       0
-#define SSC_FIRST_SYSTEM_CALL   1
+#define ARGOS_STOP_ON_INSTRUCTION_COUNT 0
+#define ARGOS_STOP_ON_FIRST_SYSTEM_CALL 1
 // Memory address types
 #define ARGOS_GUEST_VIRTUAL_ADDR    0
 #define ARGOS_GUEST_PHYSICAL_ADDR   1
@@ -52,15 +51,10 @@
 // Documentated at http://msdn.microsoft.com/en-us/library/aa365247%28VS.85%29.aspx
 #define ARGOS_MAX_PATH 260
 
+#define ARGOS_NUM_OF_LOADLIBRARY_FUNCTIONS 4
+
 #include "libdasm/libdasm.h"
 #include "argos-utility.h"
-
-typedef struct _argos_tracksc_exported_function
-{
-    const char * name;
-    target_ulong ordinal;
-    target_ulong address;
-} argos_tracksc_exported_function;
 
 typedef struct _argos_tracksc_imported_module
 {
@@ -80,6 +74,14 @@ typedef struct _argos_tracksc_imported_module
     target_ulong base_ordinal;
     slist_entry * exports;
 } argos_tracksc_imported_module;
+
+typedef struct _argos_tracksc_exported_function
+{
+    argos_tracksc_imported_module * module;
+    const char * name;
+    target_ulong ordinal;
+    target_ulong address;
+} argos_tracksc_exported_function;
 
 // The argos shellcode context contains the context that is needed to
 // to track the execution of shellcode and the bytes referenced by
@@ -106,7 +108,7 @@ typedef struct _argos_tracksc_context
     target_ulong storedby_eip;
     target_ulong executed_eip;
     INSTRUCTION instruction;
-    unsigned char instruction_bytes[MAX_INSTRUCTION_SIZE];
+    unsigned char instruction_bytes[ARGOS_MAX_INSTRUCTION_SIZE];
     // Did we logged something.
     unsigned logged;
 #ifdef ARGOS_NET_TRACKER
@@ -115,7 +117,7 @@ typedef struct _argos_tracksc_context
     // The highest stage in the current execution of shell-code.
     unsigned trace_stage;
     // corresponding raw net id.
-    argos_netidx_t instruction_netidx[MAX_INSTRUCTION_SIZE];
+    argos_netidx_t instruction_netidx[ARGOS_MAX_INSTRUCTION_SIZE];
     // Sometimes we retrieve the netidx before logging, so we cache it here
     argos_netidx_t * load_value_netidx;
     // Sometimes we retrieve the netidx before logging, so we cache it here
@@ -142,7 +144,7 @@ typedef struct _argos_tracksc_context
     // 1: LoadLibraryW
     // 2: LoadLibraryExA
     // 3: LoadLibraryExW
-    argos_tracksc_exported_function * load_library_functions[4];
+    argos_tracksc_exported_function * load_library_functions[ARGOS_NUM_OF_LOADLIBRARY_FUNCTIONS];
     // Containing the return value of a call ( the content of the eax register ), when requested.
     target_ulong saved_return_value;
     // Since mutiple returns can be nested in a function call we use the return address to 
@@ -151,5 +153,8 @@ typedef struct _argos_tracksc_context
     // This variable holds the number of calls made without a return.
     // A call level, which is higher than 1, indicates nested calls.
     target_ulong call_level;
+    // This pointer points to the function called if known, else equal to NULL.
+    // We use this in the log file.
+    argos_tracksc_exported_function * called_function;
 } argos_shellcode_context_t;
 #endif

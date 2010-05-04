@@ -74,9 +74,9 @@ void argos_tracksc_init(CPUX86State * env)
     env->shellcode_context.phase = ARGOS_TRACKSC_PHASE_IDLE;
     // Set the default condition when to stop executing and tracking
     // shell-code.
-    env->shellcode_context.stop_condition = SSC_FIRST_SYSTEM_CALL;
+    env->shellcode_context.stop_condition = ARGOS_STOP_ON_FIRST_SYSTEM_CALL;
 
-    snprintf(filename, filename_size,  LOG_SC_FL_TEMPLATE,
+    snprintf(filename, filename_size, ARGOS_TRACKSC_LOG_FILENAME_TEMPLATE,
             argos_instance_id);
     env->shellcode_context.logfile = fopen(filename, "wb");
     if (!env->shellcode_context.logfile) 
@@ -384,9 +384,9 @@ void argos_tracksc_log_instruction(CPUX86State * env)
         // Increase the number of executed instruction and check the
         // stop condition.
         env->shellcode_context.instruction_cnt++;
-        if (env->shellcode_context.stop_condition == SSC_MAX_INSTR_CNT
+        if (env->shellcode_context.stop_condition == ARGOS_STOP_ON_INSTRUCTION_COUNT
                 && env->shellcode_context.instruction_cnt ==
-                MAX_INSTRUCTION_CNT )
+                ARGOS_MAX_INSTRUCTION_COUNT )
         {
             env->shellcode_context.phase = ARGOS_TRACKSC_PHASE_IDLE;
             // For now we just pause the vm.
@@ -402,6 +402,9 @@ void argos_tracksc_check_function_call( CPUX86State * env)
 
     if (sigprocmask(SIG_BLOCK, &alrmset, NULL) != 0)
         perror("could not temporarily block signals");
+
+    // First we reset the pointer to the previously called function name.
+    env->shellcode_context.called_function = NULL;
 
     if ( argos_tracksc_is_tracking(env) && in_shellcode_context(env) )
     {
@@ -429,6 +432,9 @@ void argos_tracksc_check_function_call( CPUX86State * env)
                                 argos_tracksc_exported_function * function = find_exported_function(module, env->eip);
                                 if ( function )
                                 {
+                                    // Store the pointer to the called function.
+                                    env->shellcode_context.called_function = function;
+
                                     if ( function->name )
                                     {
                                         if ( argos_tracksc_whitelist_function_in_whitelist_entry(function->name, whitelist_entry) )
@@ -444,6 +450,7 @@ void argos_tracksc_check_function_call( CPUX86State * env)
                                         {
                                             argos_logf("Called blacklisted function %s!%s\n", module->name, function->name);
                                             //vm_stop(0);
+                                            argos_tracksc_log_instruction(env);
                                             exit_argos(env);
                                         }
                                     }
@@ -452,6 +459,7 @@ void argos_tracksc_check_function_call( CPUX86State * env)
                                 {
                                     argos_logf("Shell-code is calling unknown function in module %s, stopping Argos...\n", module->name);
                                     //vm_stop(0);
+                                    argos_tracksc_log_instruction(env);
                                     exit_argos(env);
                                 }
                             }
@@ -459,6 +467,7 @@ void argos_tracksc_check_function_call( CPUX86State * env)
                             {
                                 argos_logf("Shell-code is calling black-listed module %s, stopping Argos...\n", module->name);
                                 //vm_stop(0);
+                                argos_tracksc_log_instruction(env);
                                 exit_argos(env);
                             }
                         }
@@ -466,6 +475,7 @@ void argos_tracksc_check_function_call( CPUX86State * env)
                         {
                             argos_logf("Shell-code is calling function in an unknown module, stopping Argos...\n");
                             //vm_stop(0);
+                            argos_tracksc_log_instruction(env);
                             exit_argos(env);
                         }
                     }
@@ -473,6 +483,7 @@ void argos_tracksc_check_function_call( CPUX86State * env)
                 else
                 {
                     argos_logf("No whitelist specified and the shell-code is making an external call, stopping Argos...\n");
+                    argos_tracksc_log_instruction(env);
                     exit_argos(env);
                 }
             }
@@ -543,7 +554,7 @@ static void get_instruction_at_program_counter(CPUX86State * env)
 static void get_instruction_at_address(CPUX86State * env, target_phys_addr_t address)
 {
     int instruction_length = get_instruction(&env->shellcode_context.instruction, (BYTE *)address, MODE_32);
-    memset(env->shellcode_context.instruction_bytes, 0, MAX_INSTRUCTION_SIZE);
+    memset(env->shellcode_context.instruction_bytes, 0, ARGOS_MAX_INSTRUCTION_SIZE);
     memcpy(env->shellcode_context.instruction_bytes, (unsigned char*)address, instruction_length);
 
 #ifdef ARGOS_NET_TRACKER
@@ -551,7 +562,7 @@ static void get_instruction_at_address(CPUX86State * env, target_phys_addr_t add
     unsigned max_stage = 0;
 
     memset(env->shellcode_context.instruction_netidx, 0,
-            MAX_INSTRUCTION_SIZE);
+            ARGOS_MAX_INSTRUCTION_SIZE);
 
     for ( i = 0; i < env->shellcode_context.instruction.length; ++i )
     {
@@ -580,11 +591,26 @@ static void get_instruction_at_address(CPUX86State * env, target_phys_addr_t add
 
 static void write_instruction_to_log(argos_shellcode_context_t * context)
 {
-    char instruction_string[1024];
-    if (get_instruction_string(&context->instruction, FORMAT_INTEL, 0, instruction_string,
-                sizeof(instruction_string)))
+    if ( context->called_function && context->called_function->name
+            && context->instruction.type == INSTRUCTION_TYPE_CALL )
     {
-        fprintf(context->logfile, "%s", instruction_string);
+        fprintf(context->logfile, "call %s!%s", context->called_function->module->name,
+                context->called_function->name);
+    }
+    else if ( context->called_function && context->called_function->name
+            && context->instruction.type == INSTRUCTION_TYPE_JMP )
+    {
+        fprintf(context->logfile, "jmp %s!%s", context->called_function->module->name,
+                context->called_function->name);
+    }
+    else
+    {
+        char instruction_string[1024];
+        if (get_instruction_string(&context->instruction, FORMAT_INTEL, 0, instruction_string,
+                    sizeof(instruction_string)))
+        {
+            fprintf(context->logfile, "%s", instruction_string);
+        }
     }
 }
 
@@ -605,6 +631,8 @@ static slist_entry * get_exports_from_module(CPUX86State * env, argos_tracksc_im
 
             if ( export != NULL )
             {
+                export->module = module;
+
                 target_ulong function_ordinal_table_entry_offset = i * sizeof(uint16_t);
                 target_ulong address_of_function_ordinal = function_ordinal_table + function_ordinal_table_entry_offset;
                 uint16_t * function_ordinal = (uint16_t *) PHYS_ADDR(address_of_function_ordinal);
@@ -807,7 +835,7 @@ static argos_tracksc_imported_module * get_module(CPUX86State * env, target_ulon
             const char * module_name = (const char *)PHYS_ADDR( address_of_module_name );
             if ( module_name )
             {
-                argos_logf("Analyzing module: %s\n", module_name);
+                //argos_logf("Analyzing module: %s\n", module_name);
                 strncpy(imported_module->name, module_name, ARGOS_MAX_PATH);
                 imported_module->name[ARGOS_MAX_PATH-1] = '\0';
             }
@@ -891,7 +919,7 @@ static argos_tracksc_imported_module * get_module(CPUX86State * env, target_ulon
     }
     else
     {
-        argos_logf("Module has no export directory.\n");
+        //argos_logf("Module has no export directory.\n");
         return NULL;
     }
 }
@@ -1370,7 +1398,7 @@ static void imported_module_deleter(void * imported_module)
 
 static void export_deleter(void * export)
 {
-    free(((argos_tracksc_exported_function *)export)->name);
+    free((void *)((argos_tracksc_exported_function *)export)->name);
     free(export);
 }
 
