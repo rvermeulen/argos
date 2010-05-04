@@ -40,7 +40,7 @@ slist_entry * argos_tracksc_read_whitelist(const char * whitelist_path)
                 case '[':
                     if ( read_module_name(whitelist_file, module_name, sizeof(module_name) - 1) > 0 )
                     {
-                        argos_logf("Found module %s in tracksc whitelist.\n", module_name);
+                        //argos_logf("Found module %s in tracksc whitelist.\n", module_name);
 
                         argos_tracksc_whitelist_entry * new_entry = (argos_tracksc_whitelist_entry*)malloc(sizeof(argos_tracksc_whitelist_entry));
                         if ( !new_entry )
@@ -91,7 +91,7 @@ slist_entry * argos_tracksc_read_whitelist(const char * whitelist_path)
                     {
                         if ( read_function_name(whitelist_file, function_name, sizeof(function_name) - 1) > 0 )
                         {
-                            argos_logf("Found function %s in tracksc whitelist.\n", function_name);
+                            //argos_logf("Found function %s in tracksc whitelist.\n", function_name);
 
                             char * copy_of_function_name = strdup(function_name);
                             if ( !copy_of_function_name )
@@ -286,6 +286,6 @@ void argos_tracksc_destroy_whitelist(slist_entry * whitelist)
 
 void whitelist_deleter(void * whitelist_entry)
 {
-    free(((argos_tracksc_whitelist_entry*)whitelist_entry)->module_name);
+    free((void *)((argos_tracksc_whitelist_entry*)whitelist_entry)->module_name);
     slist_destroy(((argos_tracksc_whitelist_entry*)whitelist_entry)->functions, free);
 }
