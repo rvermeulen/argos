@@ -87,6 +87,6 @@
 #define ARGOS_STAGE_SIZE 2 // in bytes, this gives us 2^(ARGOS_STAGE_SIZE) stages we can track.
 #endif
 
-#define LOG_SC_FL_TEMPLATE "argos.sc.%d"
+#define ARGOS_TRACKSC_LOG_FILENAME_TEMPLATE "argos.sc.%d"
 
 #endif
