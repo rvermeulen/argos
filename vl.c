@@ -8466,8 +8466,8 @@ static void help(int exitcode)
 	   "                 (optional if argos logs are disabled)\n"
            "-no-csilog      do not generate an argos log when an attack is detected\n"
            "-no-fsc         do not inject forensics shellcode after an attack is detected\n"
-           "-tracksc        *EXPERIMENTAL* tracks and logs shellcode after an attack is detected\n"
-           "-tracksc-whitelist Provide a whitelist of function that may be executed by shell-code\n"
+           "-tracksc        enable post attack shell-code tracking\n"
+           "-tracksc-whitelist provide a whitelist of functions that may be executed by the shell-code\n"
 #ifdef ARGOS_WHITELIST
            "-wp profile     set the whitelist OS to profile\n"
 #endif
