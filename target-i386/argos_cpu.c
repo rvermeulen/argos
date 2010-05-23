@@ -38,7 +38,7 @@
 
 #include "argos-bytemap.h"
 #include "argos-tag.h"
-
+#include "../argos-common.h"
 
 
 void argos_init(CPUX86State *env)
