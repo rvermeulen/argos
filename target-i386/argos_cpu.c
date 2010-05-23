@@ -56,7 +56,10 @@ void argos_reset(CPUX86State *env)
     memset(&env->t2tag, 0, sizeof(env->t2tag));
     memset(env->regtags, 0 , sizeof(argos_rtag_t) * CPU_NB_REGS);
 
-    argos_tracksc_init(env);
+    if ( argos_tracksc )
+    {
+        argos_tracksc_init(env);
+    }
 }
 
 void argos_close(CPUX86State *env)
