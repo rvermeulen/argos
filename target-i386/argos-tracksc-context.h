@@ -53,6 +53,10 @@
 
 #define ARGOS_NUM_OF_LOADLIBRARY_FUNCTIONS 4
 
+#define KB 1024
+#define MB (KB*KB)
+#define ARGOS_SIZE_OF_LOG_BUFFER (100*MB)
+
 #include "libdasm/libdasm.h"
 #include "argos-utility.h"
 
@@ -97,8 +101,9 @@ typedef struct _argos_tracksc_context
     // to the process of which we are tracking the execution of shellcode.
     target_ulong cr3;
     target_ulong thread_id;
-    // The following file pointer is used for internal debugging reasons.
     FILE* logfile;
+    char * log_buffer;
+    target_ulong bytes_written_to_log_buffer;
     // The number of shell-code instructions executed.
     unsigned instruction_cnt;
     // We use the current eip to check if memory references are
@@ -156,5 +161,6 @@ typedef struct _argos_tracksc_context
     // This pointer points to the function called if known, else equal to NULL.
     // We use this in the log file.
     argos_tracksc_exported_function * called_function;
+    unsigned char single_step;
 } argos_shellcode_context_t;
 #endif

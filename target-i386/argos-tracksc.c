@@ -3,6 +3,9 @@
 #include <string.h>
 #include <wchar.h>
 #include <signal.h>
+#include <time.h>
+#include <unistd.h>
+#include <stdarg.h>
 
 #include "cpu.h"
 #include "argos-config.h"
@@ -15,7 +18,8 @@
 #include "argos-tracksc.h"
 
 static void get_instruction_at_program_counter(CPUX86State * env);
-static void get_instruction_at_address(CPUX86State * env, target_phys_addr_t address);
+static void get_instruction_at_address(CPUX86State * env,
+        target_phys_addr_t address);
 static void address_translation_failure(target_ulong address);
 static void log_instruction(CPUX86State * env);
 static void write_instruction_to_log(argos_shellcode_context_t * context);
@@ -25,17 +29,28 @@ static unsigned char in_shellcode_context(CPUX86State * env);
 static void save_shellcode_context(CPUX86State * env);
 static void start_analysis_phase(CPUX86State * env);
 static void start_tracking_phase(CPUX86State * env);
-static argos_tracksc_imported_module * find_module(CPUX86State * env, target_ulong address);
-static argos_tracksc_exported_function * find_exported_function(argos_tracksc_imported_module * module, target_ulong address);
-static argos_tracksc_exported_function * find_exported_function_by_name(CPUX86State * env, const char * name);
-static slist_entry * get_exports_from_module(CPUX86State * env, argos_tracksc_imported_module * module);
+static argos_tracksc_imported_module * find_module(CPUX86State * env,
+        target_ulong address);
+static argos_tracksc_exported_function * find_exported_function(
+        CPUX86State * env, argos_tracksc_imported_module * module,
+        target_ulong address);
+static argos_tracksc_exported_function * find_exported_function_by_name(
+        CPUX86State * env, const char * name);
+static slist_entry * get_exports_from_module(CPUX86State * env,
+        argos_tracksc_imported_module * module);
 static unsigned get_load_library_functions(CPUX86State * env);
-static argos_tracksc_exported_function * is_loading_library_call(CPUX86State * env, target_ulong callee_address);
+static argos_tracksc_exported_function * is_loading_library_call(
+        CPUX86State * env, target_ulong callee_address);
+static unsigned char is_loadlibrary_function(const char * function_name);
 static void save_return_address(CPUX86State * env);
 static void imported_module_deleter(void * imported_module);
 static void export_deleter(void * export);
 static void exit_argos(CPUX86State * env);
+static void append_to_logfile(argos_shellcode_context_t * context,
+        const char * format_string, ...);
+static void flush_log_buffer(argos_shellcode_context_t * context);
 extern void vm_stop(int reason);
+
 
 target_phys_addr_t translate_address(CPUX86State *env, target_ulong address)
 {
@@ -95,6 +110,9 @@ void argos_tracksc_stop(CPUX86State * env)
 {
     if (env->shellcode_context.logfile)
     {
+        flush_log_buffer(&env->shellcode_context);
+        free(env->shellcode_context.log_buffer);
+        env->shellcode_context.log_buffer = NULL;
         fclose(env->shellcode_context.logfile);
         argos_logf("Closed shellcode log file\n");
         env->shellcode_context.logfile = 0;
@@ -102,7 +120,8 @@ void argos_tracksc_stop(CPUX86State * env)
     }
 
     // Clean-up existing imported modules information.
-    slist_destroy(env->shellcode_context.imported_modules, imported_module_deleter);
+    slist_destroy(env->shellcode_context.imported_modules,
+            imported_module_deleter);
 
     if ( argos_tracksc_whitelist )
     {
@@ -203,9 +222,13 @@ void argos_tracksc_log_instruction(CPUX86State * env)
         if ( env->shellcode_context.trace_stage <
                 env->shellcode_context.instruction_stage )
         {
-            fprintf(env->shellcode_context.logfile, "Stage %u -> %u\n", 
+            append_to_logfile(&env->shellcode_context, "Stage %u -> %u\n", 
                     env->shellcode_context.trace_stage,
                     env->shellcode_context.instruction_stage);
+
+            /*fprintf(env->shellcode_context.logfile, "Stage %u -> %u\n", 
+                    env->shellcode_context.trace_stage,
+                    env->shellcode_context.instruction_stage);*/
 
             env->shellcode_context.trace_stage =
                 env->shellcode_context.instruction_stage;
@@ -213,35 +236,50 @@ void argos_tracksc_log_instruction(CPUX86State * env)
 #endif // ARGOS_NET_TRACKER
 
         // Print the eip address of the current executing instruction.
-        fprintf(env->shellcode_context.logfile, "0x%x ", 
+        append_to_logfile(&env->shellcode_context, "0x%x ",
                 env->shellcode_context.executed_eip);
 
-        fprintf(env->shellcode_context.logfile, "\t");
+        /*fprintf(env->shellcode_context.logfile, "0x%x ", 
+                env->shellcode_context.executed_eip);
+                */
+
+        append_to_logfile(&env->shellcode_context, "\t");
+        //fprintf(env->shellcode_context.logfile, "\t");
 
         write_instruction_to_log(&env->shellcode_context);
 
-        fprintf(env->shellcode_context.logfile, "\t");
-        fprintf(env->shellcode_context.logfile, " ");
+        append_to_logfile(&env->shellcode_context, "\t");
+        //fprintf(env->shellcode_context.logfile, "\t");
+        append_to_logfile(&env->shellcode_context, " ");
+        //fprintf(env->shellcode_context.logfile, " ");
 
         // Print the bytes of the instruction
         for (i = 0; i < env->shellcode_context.instruction.length; i++)
         {
-            fprintf(env->shellcode_context.logfile, "%x ",
+            append_to_logfile(&env->shellcode_context, "%x ",
                     env->shellcode_context.instruction_bytes[i] & 0xFF);
+            //fprintf(env->shellcode_context.logfile, "%x ",
+            //        env->shellcode_context.instruction_bytes[i] & 0xFF);
         }
-        fprintf(env->shellcode_context.logfile, "\t");
+        append_to_logfile(&env->shellcode_context, "\t");
+        //fprintf(env->shellcode_context.logfile, "\t");
 
 #ifdef ARGOS_NET_TRACKER
         // Print the netidx's of the instruction bytes.
         for (i = 0; i < env->shellcode_context.instruction.length; i++)
         {
-            fprintf(env->shellcode_context.logfile, "[%u] ",
+            /*fprintf(env->shellcode_context.logfile, "[%u] ",
+                    ARGOS_GET_NETIDX(
+                        env->shellcode_context.instruction_netidx[i])
+                   );*/
+            append_to_logfile(&env->shellcode_context, "[%u] ",
                     ARGOS_GET_NETIDX(
                         env->shellcode_context.instruction_netidx[i])
                    );
         }
 
-        fprintf(env->shellcode_context.logfile, "\t");
+        append_to_logfile(&env->shellcode_context, "\t");
+        //fprintf(env->shellcode_context.logfile, "\t");
 #endif // ARGOS_NET_TRACKER
 
         // If the instruction performed a load,
@@ -250,11 +288,16 @@ void argos_tracksc_log_instruction(CPUX86State * env)
                 env->shellcode_context.executed_eip)
         {
 
-            fprintf(env->shellcode_context.logfile, " <- @0x%lx (0x%x) ",
+            /*fprintf(env->shellcode_context.logfile, " <- @0x%lx (0x%x) ",
+                    env->shellcode_context.load_addr,
+                    env->shellcode_context.load_value);
+                    */
+            append_to_logfile(&env->shellcode_context, " <- @0x%lx (0x%x) ",
                     env->shellcode_context.load_addr,
                     env->shellcode_context.load_value);
 
-            fprintf(env->shellcode_context.logfile, "\t");
+            append_to_logfile(&env->shellcode_context, "\t");
+            //fprintf(env->shellcode_context.logfile, "\t");
 
 #ifdef ARGOS_NET_TRACKER
             // Print the netidx's belonging to the value loaded.
@@ -292,18 +335,26 @@ void argos_tracksc_log_instruction(CPUX86State * env)
                     if (env->shellcode_context.load_addr_type ==
                             ARGOS_HOST_VIRTUAL_ADDR)
                     {
-                        fprintf(env->shellcode_context.logfile, "@[%u] ",
+                        /*fprintf(env->shellcode_context.logfile, "@[%u] ",
+                                ARGOS_GET_NETIDX(*netidx));
+                                */
+                        append_to_logfile(&env->shellcode_context, "@[%u] ",
                                 ARGOS_GET_NETIDX(*netidx));
                     }
                     else
                     {
-                        fprintf(env->shellcode_context.logfile, "[%u] ",
+                        /* fprintf(env->shellcode_context.logfile, "[%u] ",
+                                ARGOS_GET_NETIDX(*netidx));
+                                */
+                        append_to_logfile(&env->shellcode_context, "[%u] ",
                                 ARGOS_GET_NETIDX(*netidx));
                     }
                 }
                 else
                 {
-                    fprintf(env->shellcode_context.logfile, "[%u] ", 0);
+                    //fprintf(env->shellcode_context.logfile, "[%u] ", 0);
+                    append_to_logfile(&env->shellcode_context, "[%u] ", 0);
+
                 }
             }
 #endif // ARGOS_NET_TRACKER
@@ -319,11 +370,16 @@ void argos_tracksc_log_instruction(CPUX86State * env)
         if (env->shellcode_context.storedby_eip ==
                 env->shellcode_context.executed_eip)
         {
-            fprintf(env->shellcode_context.logfile, " -> @0x%lx (0x%x) ",
+            /*fprintf(env->shellcode_context.logfile, " -> @0x%lx (0x%x) ",
+                    env->shellcode_context.store_addr,
+                    env->shellcode_context.store_value);
+                    */
+            append_to_logfile(&env->shellcode_context, " -> @0x%lx (0x%x) ",
                     env->shellcode_context.store_addr,
                     env->shellcode_context.store_value);
 
-            fprintf(env->shellcode_context.logfile, "\t");
+            //fprintf(env->shellcode_context.logfile, "\t");
+            append_to_logfile(&env->shellcode_context, "\t");
 
 #ifdef ARGOS_NET_TRACKER
             for (i = 0; i < env->shellcode_context.store_size; i++)
@@ -354,18 +410,25 @@ void argos_tracksc_log_instruction(CPUX86State * env)
                     if (env->shellcode_context.store_addr_type ==
                             ARGOS_HOST_VIRTUAL_ADDR)
                     {
-                        fprintf(env->shellcode_context.logfile, "@[%u] ",
+                        /*fprintf(env->shellcode_context.logfile, "@[%u] ",
                                 ARGOS_GET_NETIDX(*netidx));
+                                */
+                        append_to_logfile(&env->shellcode_context,
+                                "@[%u] ", ARGOS_GET_NETIDX(*netidx));
                     }
                     else
                     {
-                        fprintf(env->shellcode_context.logfile, "[%u] ",
+                        /*fprintf(env->shellcode_context.logfile, "[%u] ",
+                                ARGOS_GET_NETIDX(*netidx));
+                                */
+                        append_to_logfile(&env->shellcode_context, "[%u] ",
                                 ARGOS_GET_NETIDX(*netidx));
                     }
                 }
                 else
                 {
-                    fprintf(env->shellcode_context.logfile, "[%u] ", 0);
+                    //fprintf(env->shellcode_context.logfile, "[%u] ", 0);
+                    append_to_logfile(&env->shellcode_context, "[%u] ", 0);
                 }
             }
 #endif // ARGOS_NET_TRACKER
@@ -375,8 +438,9 @@ void argos_tracksc_log_instruction(CPUX86State * env)
             env->shellcode_context.store_size = 0;
             env->shellcode_context.storedby_eip = 0;
         }
-        fprintf(env->shellcode_context.logfile, "\n");
-        fflush(env->shellcode_context.logfile);
+        //fprintf(env->shellcode_context.logfile, "\n");
+        append_to_logfile(&env->shellcode_context, "\n");
+        //fflush(env->shellcode_context.logfile);
 
         // We have logged the code.
         env->shellcode_context.logged = 0;
@@ -417,39 +481,59 @@ void argos_tracksc_check_function_call( CPUX86State * env)
                 {
                     if ( env->shellcode_context.call_level == 0 )
                     {
-                        // Raise call-level to 1 for calls made by the shell-code
-                        // to external functions
+                        /*clock_t begin, end; begin = end = (clock_t) -1;
+                        double runningtime_in_seconds = 0.0;
+                        long CLOCK_TICKS_PER_SECOND = sysconf(_SC_CLK_TCK);
+
+                        begin = clock();
+                        if ( begin == (clock_t)-1)
+                        {
+                            argos_logf("Failed to retrieve clock ticks.\n");
+                        }*/
+                        // Raise call-level to 1 for calls made by the i
+                        // shell-code to external functions
                         env->shellcode_context.call_level++;
                         save_return_address(env);
 
-                        argos_tracksc_imported_module * module = find_module(env, env->eip);
+                        argos_tracksc_imported_module * module =
+                            find_module(env, env->eip);
                         if ( module )
                         {
-                            argos_tracksc_whitelist_entry * whitelist_entry = argos_tracksc_find_module_in_whitelist(module->name, argos_tracksc_whitelist);
+                            argos_tracksc_whitelist_entry * whitelist_entry =
+                                argos_tracksc_find_module_in_whitelist(
+                                        module->name, argos_tracksc_whitelist);
 
                             if ( whitelist_entry )
                             {
-                                argos_tracksc_exported_function * function = find_exported_function(module, env->eip);
+                                argos_tracksc_exported_function * function =
+                                    find_exported_function(env, module, env->eip);
+
                                 if ( function )
                                 {
-                                    // Store the pointer to the called function.
-                                    env->shellcode_context.called_function = function;
+                                    // Store the pointer to the called function
+                                    env->shellcode_context.called_function =
+                                        function;
 
                                     if ( function->name )
                                     {
-                                        if ( argos_tracksc_whitelist_function_in_whitelist_entry(function->name, whitelist_entry) )
+                                        if ( argos_tracksc_whitelist_function_in_whitelist_entry(
+                                                    function->name,
+                                                    whitelist_entry) )
                                         {
-                                            //argos_logf("Called whitelisted %s!%s\n", module->name, function->name);
-                                            if (is_loading_library_call(env, env->eip))
+                                            if (is_loadlibrary_function(
+                                                        function->name))
                                             {
-                                                // Raise call-level to 2 for LoadLibrary calls.
+                                                // Raise call-level to 2 for
+                                                // LoadLibrary calls.
                                                 env->shellcode_context.call_level++;
                                             }
+
+                                            //env->shellcode_context.single_step = 0;
+                                            //tb_flush(env);
                                         }
                                         else
                                         {
                                             argos_logf("Called blacklisted function %s!%s\n", module->name, function->name);
-                                            //vm_stop(0);
                                             argos_tracksc_log_instruction(env);
                                             exit_argos(env);
                                         }
@@ -458,15 +542,20 @@ void argos_tracksc_check_function_call( CPUX86State * env)
                                 else
                                 {
                                     argos_logf("Shell-code is calling unknown function in module %s, stopping Argos...\n", module->name);
-                                    //vm_stop(0);
                                     argos_tracksc_log_instruction(env);
                                     exit_argos(env);
+                                }
+
+                                // If the analysis phase did not parsed the 
+                                // exports, we have to clean it up ourselves.
+                                if (module->exports == NULL)
+                                {
+                                    export_deleter((void*)function);
                                 }
                             }
                             else
                             {
                                 argos_logf("Shell-code is calling black-listed module %s, stopping Argos...\n", module->name);
-                                //vm_stop(0);
                                 argos_tracksc_log_instruction(env);
                                 exit_argos(env);
                             }
@@ -474,10 +563,19 @@ void argos_tracksc_check_function_call( CPUX86State * env)
                         else
                         {
                             argos_logf("Shell-code is calling function in an unknown module, stopping Argos...\n");
-                            //vm_stop(0);
                             argos_tracksc_log_instruction(env);
                             exit_argos(env);
                         }
+                        /*end = clock();
+                        if ( end == (clock_t)-1)
+                        {
+                            argos_logf("Failed to retrieve clock ticks.\n");
+                        }
+                        runningtime_in_seconds = (end - begin)/CLOCK_TICKS_PER_SECOND;
+
+                        argos_logf("Call check running time: %u ticks %f seconds.\n", end - begin, runningtime_in_seconds);
+                        */
+
                     }
                 }
                 else
@@ -594,13 +692,19 @@ static void write_instruction_to_log(argos_shellcode_context_t * context)
     if ( context->called_function && context->called_function->name
             && context->instruction.type == INSTRUCTION_TYPE_CALL )
     {
-        fprintf(context->logfile, "call %s!%s", context->called_function->module->name,
+        /*fprintf(context->logfile, "call %s!%s", context->called_function->module->name,
+                context->called_function->name);*/
+        append_to_logfile(context, "call %s!%s",
+                context->called_function->module->name,
                 context->called_function->name);
     }
     else if ( context->called_function && context->called_function->name
             && context->instruction.type == INSTRUCTION_TYPE_JMP )
     {
-        fprintf(context->logfile, "jmp %s!%s", context->called_function->module->name,
+        /*fprintf(context->logfile, "jmp %s!%s", context->called_function->module->name,
+                context->called_function->name);*/
+        append_to_logfile(context, "jmp %s!%s", 
+                context->called_function->module->name,
                 context->called_function->name);
     }
     else
@@ -609,7 +713,8 @@ static void write_instruction_to_log(argos_shellcode_context_t * context)
         if (get_instruction_string(&context->instruction, FORMAT_INTEL, 0, instruction_string,
                     sizeof(instruction_string)))
         {
-            fprintf(context->logfile, "%s", instruction_string);
+            //fprintf(context->logfile, "%s", instruction_string);
+            append_to_logfile(context, "%s", instruction_string);
         }
     }
 }
@@ -692,22 +797,16 @@ static slist_entry * get_exports_from_module(CPUX86State * env, argos_tracksc_im
                             else
                             {
                                 free(export);
-                                //argos_logf("Invalid address of function name!!!\n");
-                                //address_translation_failure(address_of_function_name);
                             }
                         }
                         else
                         {
                             free(export);
-                            //argos_logf("Invalid address of function name rva!!!\n");
-                            //address_translation_failure(address_of_function_name_rva);
                         }
                     }
                     else
                     {
                         free(export);
-                        //argos_logf("Invalid address of function address!!!\n");
-                        //address_translation_failure(address_of_function_address);
                     }
                 }
                 else
@@ -913,7 +1012,8 @@ static argos_tracksc_imported_module * get_module(CPUX86State * env, target_ulon
         imported_module->function_name_table = *function_name_table_rva + imported_module->begin_address;
         imported_module->function_ordinal_table = *function_ordinal_table_rva + imported_module->begin_address;
         imported_module->base_ordinal = *module_base_ordinal;
-        imported_module->exports = get_exports_from_module(env, imported_module);
+        //imported_module->exports = get_exports_from_module(env, imported_module);
+        imported_module->exports = NULL;
 
         return imported_module;
     }
@@ -1112,21 +1212,48 @@ static void save_shellcode_context(CPUX86State * env)
 
 static void start_analysis_phase(CPUX86State * env)
 {
+    /*clock_t begin, end; begin = end = (clock_t) -1;
+    double runningtime_in_seconds = 0.0;
+    long CLOCK_TICKS_PER_SECOND = sysconf(_SC_CLK_TCK);
+    begin = clock();
+    if ( begin == (clock_t)-1)
+    {
+        argos_logf("Failed to retrieve clock ticks.\n");
+    }*/
+
     env->shellcode_context.phase = ARGOS_TRACKSC_PHASE_ANALYZING;
 
-    argos_logf("Getting imported modules\n");
+    argos_logf("Searching for imported modules.\n");
     get_imported_modules(env);
 
-    argos_logf("Searching for LoadLibrary\n");
+    /*argos_logf("Searching for LoadLibrary functions.\n");
     if ( get_load_library_functions(env) == 0 )
     {
         argos_logf("No LoadLibrary functions found, shell-code will not be able to load libaries.\n");
+    }*/
+
+    /*end = clock();
+    if ( end == (clock_t)-1)
+    {
+        argos_logf("Failed to retrieve clock ticks.\n");
     }
+    runningtime_in_seconds = (end - begin)/CLOCK_TICKS_PER_SECOND;
+
+    argos_logf("Analysis phase running time: %u ticks %f seconds.\n", end - begin, runningtime_in_seconds);
+    */
 }
 
 static void start_tracking_phase(CPUX86State * env)
 {
     env->shellcode_context.phase = ARGOS_TRACKSC_PHASE_TRACKING;
+    env->shellcode_context.single_step = 1;
+
+    env->shellcode_context.log_buffer = (char*)malloc(sizeof(char) * ARGOS_SIZE_OF_LOG_BUFFER);
+    if ( env->shellcode_context.log_buffer == NULL )
+    {
+        argos_logf("Error: Failed to allocate memory for log buffer.\n");
+        exit_argos(env);
+    }
 
     argos_logf("Successfully instanciated shellcode tracking\n");
     // We have successfully initialized the shellcode context,
@@ -1166,22 +1293,136 @@ static argos_tracksc_imported_module * find_module(CPUX86State * env, target_ulo
     return NULL;
 }
 
-static argos_tracksc_exported_function * find_exported_function(argos_tracksc_imported_module * module,
+static argos_tracksc_exported_function * find_exported_function(
+        CPUX86State * env,
+        argos_tracksc_imported_module * module,
         target_ulong address)
 {
-    slist_entry * cursor = module->exports;
-    while ( cursor )
+    if (module->exports)
     {
-        argos_tracksc_exported_function * function = (argos_tracksc_exported_function*) slist_get_data(cursor);
-        if ( function )
+        // We have loaded the exports in the analysis phase, search this list.
+        slist_entry * cursor = module->exports;
+        while ( cursor )
         {
-            if ( function->address == address )
+            argos_tracksc_exported_function * function =
+                (argos_tracksc_exported_function*) slist_get_data(cursor);
+            if ( function )
             {
-                return function;
+                if ( function->address == address )
+                {
+                    return function;
+                }
+            }
+
+            cursor = slist_next(cursor);
+        }
+    }
+    else
+    {
+        // We have deferred loading in the analysis phase, search the 
+        // export directory.
+        target_ulong function_address_table = module->function_address_table;
+        target_ulong function_ordinal_table = module->function_ordinal_table;
+        target_ulong function_name_table = module->function_name_table;
+
+        unsigned i = 0;
+        for(; i < module->number_of_functions; ++i)
+        {
+            argos_tracksc_exported_function * export =
+                (argos_tracksc_exported_function *)
+                malloc(sizeof(argos_tracksc_exported_function));
+
+            if ( export != NULL )
+            {
+                export->module = module;
+
+                target_ulong function_ordinal_table_entry_offset =
+                    i * sizeof(uint16_t);
+                target_ulong address_of_function_ordinal =
+                    function_ordinal_table
+                    + function_ordinal_table_entry_offset;
+                uint16_t * function_ordinal = (uint16_t *)
+                    PHYS_ADDR(address_of_function_ordinal);
+
+                if ( function_ordinal )
+                {
+                    export->ordinal = *function_ordinal;
+
+                    target_ulong function_address_table_entry_offset =
+                        export->ordinal * sizeof(uint32_t);
+                    target_ulong address_of_function_address =
+                        function_address_table
+                        + function_address_table_entry_offset;
+                    target_ulong * function_address =
+                        (target_ulong*) PHYS_ADDR(address_of_function_address);
+
+                    if ( function_address )
+                    {
+                        export->address = *function_address
+                            + module->begin_address;
+                        if (export->address == address)
+                        {
+
+                            target_ulong function_name_table_entry_offset = i
+                                * sizeof(uint32_t);
+                            target_ulong address_of_function_name_rva =
+                                function_name_table
+                                + function_name_table_entry_offset;
+                            target_ulong * function_name_rva = (target_ulong*)
+                                PHYS_ADDR(address_of_function_name_rva);
+
+                            if ( function_name_rva )
+                            {
+                                target_ulong address_of_function_name = 
+                                    module->begin_address + *function_name_rva;
+                                const char * function_name = (const char *)
+                                    PHYS_ADDR(address_of_function_name);
+
+                                if ( function_name )
+                                {
+                                    export->name = strdup(function_name);
+                                    if ( export->name != NULL )
+                                    {
+                                        return export;
+                                    }
+                                    else
+                                    {
+                                        argos_logf("Insufficient memory to save imported module information, quiting Argos.\n");
+                                        exit(1);
+                                    }
+
+                                }
+                                else
+                                {
+                                    free(export);
+                                }
+                            }
+                            else
+                            {
+                                free(export);
+                            }
+                        }
+                        else
+                        {
+                            free(export);
+                        }
+                    }
+                    else
+                    {
+                        free(export);
+                    }
+                }
+                else
+                {
+                    free(export);
+                }
+            }
+            else
+            {
+                argos_logf("Insufficient memory to save imported module information, quiting Argos.\n");
+                exit(1);
             }
         }
-
-        cursor = slist_next(cursor);
     }
     return NULL;
 }
@@ -1260,6 +1501,30 @@ static unsigned get_load_library_functions(CPUX86State * env)
     return found_functions;
 }
 
+static unsigned char is_loadlibrary_function(const char * function_name)
+{
+    if ( strcmp(function_name, "LoadLibraryA") == 0 )
+    {
+        return 1;
+    }
+    else if (strcmp(function_name, "LoadLibraryW") == 0)
+    {
+        return 1;
+    }
+    else if (strcmp(function_name, "LoadLibraryExA") == 0)
+    {
+        return 1;
+    }
+    else if (strcmp(function_name, "LoadLibraryExW") == 0)
+    {
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
+
+}
 // Returns a pointer to the argos_tracksc_exported_function
 // struct of the LoadLibrary function called.
 // NULL if no function from the LoadLibrary family is called.
@@ -1339,50 +1604,84 @@ void argos_tracksc_check_for_return(CPUX86State * env)
     if (sigprocmask(SIG_BLOCK, &alrmset, NULL) != 0)
         perror("could not temporarily block signals");
 
-    if ( argos_tracksc_is_tracking(env) && in_shellcode_context(env) && env->shellcode_context.call_level > 0) 
+    if ( argos_tracksc_is_tracking(env) && in_shellcode_context(env)
+            && env->shellcode_context.call_level > 0)
     {
         if ( env->shellcode_context.saved_return_address != 0
                 && env->shellcode_context.saved_return_address == env->eip )
         {
             if ( env->shellcode_context.call_level == 2 )
             {
-                env->shellcode_context.saved_return_value = env->regs[R_EAX];
-                argos_tracksc_imported_module * loaded_module = get_module(env, env->regs[R_EAX]);
-                if ( loaded_module )
+                /*clock_t begin, end; begin = end = (clock_t)-1;
+                double runningtime_in_seconds = 0;
+                long CLOCK_TICKS_PER_SECOND = sysconf(_SC_CLK_TCK);
+
+                begin = clock();
+                if ( begin == (clock_t)-1)
                 {
-                    argos_logf("Loaded %s\n", loaded_module->name);
-                    if (env->shellcode_context.imported_modules)
+                    argos_logf("Failed to retrieve clock ticks");
+                }*/
+
+                env->shellcode_context.saved_return_value = env->regs[R_EAX];
+
+                if ( env->shellcode_context.saved_return_value != 0 )
+                {
+                    argos_tracksc_imported_module * loaded_module = get_module(env,
+                            env->regs[R_EAX]);
+                    if ( loaded_module )
                     {
-                        slist_entry * tail = slist_add_after(env->shellcode_context.imported_modules, loaded_module);
-                        if (!tail)
+                        argos_logf("Loaded %s\n", loaded_module->name);
+                        if (env->shellcode_context.imported_modules)
                         {
-                            argos_logf("Unable to allocate memory for analysis!!");
-                            exit(1);
+                            slist_entry * tail = slist_add_after(
+                                    env->shellcode_context.imported_modules,
+                                    loaded_module);
+                            if (!tail)
+                            {
+                                argos_logf("Unable to allocate memory for analysis!!");
+                                exit(1);
+                            }
+                        }
+                        else
+                        {
+                            slist_entry * head = slist_create();
+                            if ( head )
+                            {
+                                slist_set_data(head, loaded_module);
+                                env->shellcode_context.imported_modules = head;
+                            }
+                            else
+                            {
+                                argos_logf("Unable to allocate memory for analysis!!");
+                                exit(1);
+                            }
                         }
                     }
                     else
                     {
-                        slist_entry * head = slist_create();
-                        if ( head )
-                        {
-                            slist_set_data(head, loaded_module);
-                            env->shellcode_context.imported_modules = head;
-                        }
-                        else
-                        {
-                            argos_logf("Unable to allocate memory for analysis!!");
-                            exit(1);
-                        }
+                        argos_logf("Loaded module is not a valid library!\n");
                     }
                 }
                 else
                 {
-                    argos_logf("Loaded module is not a valid library!\n");
+                    argos_logf("LoadLibrary call failed, skipping module analysis.\n");
                 }
+
+                /*end = clock();
+                if ( end  == (clock_t)-1)
+                {
+                    argos_logf("Failed to retrieve clock ticks");
+                }
+                runningtime_in_seconds = (end - begin) / CLOCK_TICKS_PER_SECOND;
+                argos_logf("Loading of external library: %u ticks %f seconds\n"
+                        , end - begin, runningtime_in_seconds);*/
             }
 
             env->shellcode_context.call_level = 0;
             env->shellcode_context.saved_return_address = 0;
+
+            //env->shellcode_context.single_step = 1;
+            //tb_flush(env);
         }
     }
 
@@ -1392,7 +1691,8 @@ void argos_tracksc_check_for_return(CPUX86State * env)
 
 static void imported_module_deleter(void * imported_module)
 {
-    slist_destroy(((argos_tracksc_imported_module *) imported_module)->exports, export_deleter);
+    slist_destroy(((argos_tracksc_imported_module *) imported_module)->exports,
+            export_deleter);
     free(imported_module);
 }
 
@@ -1406,4 +1706,64 @@ static void exit_argos(CPUX86State * env)
 {
     argos_tracksc_stop(env);
     exit(0);
+}
+
+static void append_to_logfile(argos_shellcode_context_t * context,
+        const char * format_string, ...)
+{
+    va_list argument_list;
+
+    va_start(argument_list, format_string);
+    int number_characters_that_should_been_written;
+    size_t space_left = ARGOS_SIZE_OF_LOG_BUFFER -
+        context->bytes_written_to_log_buffer;
+write_buffer:
+    number_characters_that_should_been_written =
+        vsnprintf( context->log_buffer + context->bytes_written_to_log_buffer,
+                space_left, format_string, argument_list);
+
+    if ( number_characters_that_should_been_written > space_left)
+    {
+        if ( number_characters_that_should_been_written <
+                ARGOS_SIZE_OF_LOG_BUFFER )
+        {
+            if ( fprintf(context->logfile, "%s", context->log_buffer) < 0 )
+            {
+                argos_logf("Failed to write to log file!!!\n");
+                exit(1);
+            }
+            context->bytes_written_to_log_buffer = 0;
+            space_left = ARGOS_SIZE_OF_LOG_BUFFER;
+            goto write_buffer;
+        }
+        else
+        {
+            argos_logf("Warning: Log buffer to small, writing directly \
+                    to log file.\n");
+            vfprintf(context->logfile, format_string, argument_list);
+        }
+    }
+    else if ( number_characters_that_should_been_written >= 0 )
+    {
+        // The number of characters that should been written does not include
+        // the trailing zero '\0'
+        context->bytes_written_to_log_buffer +=
+            number_characters_that_should_been_written;
+    }
+    else
+    {
+        argos_logf("Failed to write to log buffer!!!\n");
+        exit(1);
+    }
+
+    va_end(argument_list);
+}
+
+static void flush_log_buffer(argos_shellcode_context_t * context)
+{
+    if ( fprintf(context->logfile, "%s", context->log_buffer) < 0 )
+    {
+        argos_logf("Failed to write to log file!!!\n");
+        exit(1);
+    }
 }
