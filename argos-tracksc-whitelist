@@ -5,10 +5,12 @@ LoadLibraryA
 LoadLibraryExA
 LoadLibraryW
 LoadLibraryExW
+#CreateProcessA
+#WaitForSingleObject
 [ws2_32.dll]
 WSAStartup
 WSASocketA
 bind
 listen
-# Black list accept to stop there.
-# accept
+accept
+closesocket
