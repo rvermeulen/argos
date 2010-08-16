@@ -156,9 +156,18 @@ int inet_aton(const char *cp, struct in_addr *ia);
 #include "config-host.h"
 
 #ifdef ARGOS_NET_TRACKER
-# define PHYS_RAM_MAX_SIZE (512 * 1024 * 1024) // 512MB RAM + up to 2GB MEMMAP 
+    #if HOST_X86_64
+        //#define PHYS_RAM_MAX_SIZE 4294967296
+        #define PHYS_RAM_MAX_SIZE ( 4L * 1024L * 1024L * 1024L ) // 3.2TB ram + up to 12.8TB MEMMAP
+    #else
+        #define PHYS_RAM_MAX_SIZE (512 * 1024 * 1024) // 512MB RAM + up to 2GB MEMMAP 
+    #endif
 #else
-# define PHYS_RAM_MAX_SIZE (1280 * 1024 * 1024) // 1.25GB RAM + up to 1.25GB MEMMAP 
+    #if HOST_X86_64
+        #define PHYS_RAM_MAX_SIZE (1280 * 1024 * 1024) // 1.25GB RAM + up to 1.25GB MEMMAP 
+    #else
+        #define PHYS_RAM_MAX_SIZE (1280 * 1024 * 1024) // 1.25GB RAM + up to 1.25GB MEMMAP 
+    #endif
 #endif
 
 #ifdef TARGET_PPC
@@ -191,7 +200,7 @@ static DisplayState display_state;
 int nographic;
 const char* keyboard_layout = NULL;
 int64_t ticks_per_sec;
-int ram_size;
+unsigned long ram_size;
 int pit_min_timer_count = 0;
 int nb_nics;
 NICInfo nd_table[MAX_NICS];
@@ -9323,14 +9332,22 @@ int main(int argc, char **argv)
                 help(0);
                 break;
             case QEMU_OPTION_m:
-                ram_size = atoi(optarg) * 1024 * 1024;
-                if (ram_size <= 0)
-                    help(1);
-                if (ram_size > PHYS_RAM_MAX_SIZE) {
-                    fprintf(stderr, "argos: at most %d MB RAM can be simulated "
-				    "safely\n",
-                            PHYS_RAM_MAX_SIZE / (1024 * 1024));
-                    exit(1);
+                {
+                    unsigned long ram_size_in_mb = strtoul(optarg, NULL, 10);
+                    if ( ram_size_in_mb == ULONG_MAX && errno == ERANGE )
+                    {
+                        fprintf(stderr, "The specified ram value is out of range!");
+                        exit(1);
+                    }
+                    ram_size = ram_size_in_mb * 1024 * 1024;
+                    if (ram_size == 0)
+                        help(1);
+                    if (ram_size > PHYS_RAM_MAX_SIZE) {
+                        fprintf(stderr, "argos: at most %lu MB RAM can be simulated "
+                                "safely\n",
+                                PHYS_RAM_MAX_SIZE / (1024L * 1024L));
+                        exit(1);
+                    }
                 }
                 break;
             case QEMU_OPTION_d:
