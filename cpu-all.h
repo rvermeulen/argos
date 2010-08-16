@@ -880,7 +880,7 @@ int argos_cpu_inl(CPUState *env, int addr, argos_rtag_t *tag);
 
 /* memory API */
 
-extern int phys_ram_size;
+extern unsigned long phys_ram_size;
 extern int phys_ram_fd;
 extern uint8_t *phys_ram_base;
 extern uint8_t *phys_ram_dirty;

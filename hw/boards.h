@@ -3,7 +3,7 @@
 #ifndef HW_BOARDS_H
 #define HW_BOARDS_H
 
-typedef void QEMUMachineInitFunc(int ram_size, int vga_ram_size,
+typedef void QEMUMachineInitFunc(unsigned long ram_size, unsigned long vga_ram_size,
                                  const char *boot_device, DisplayState *ds,
                                  const char *kernel_filename,
                                  const char *kernel_cmdline,

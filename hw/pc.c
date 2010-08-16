@@ -700,7 +700,7 @@ static void pc_init_ne2k_isa(NICInfo *nd, qemu_irq *pic)
 }
 
 /* PC hardware initialisation */
-static void pc_init1(int ram_size, int vga_ram_size,
+static void pc_init1(unsigned long ram_size, unsigned long vga_ram_size,
                      const char *boot_device, DisplayState *ds,
                      const char *kernel_filename, const char *kernel_cmdline,
                      const char *initrd_filename,
@@ -1023,7 +1023,7 @@ static void pc_init1(int ram_size, int vga_ram_size,
 #endif
 }
 
-static void pc_init_pci(int ram_size, int vga_ram_size,
+static void pc_init_pci(unsigned long ram_size, unsigned long vga_ram_size,
                         const char *boot_device, DisplayState *ds,
                         const char *kernel_filename,
                         const char *kernel_cmdline,
@@ -1035,7 +1035,7 @@ static void pc_init_pci(int ram_size, int vga_ram_size,
              initrd_filename, 1, cpu_model);
 }
 
-static void pc_init_isa(int ram_size, int vga_ram_size,
+static void pc_init_isa(unsigned long ram_size, unsigned long vga_ram_size,
                         const char *boot_device, DisplayState *ds,
                         const char *kernel_filename,
                         const char *kernel_cmdline,

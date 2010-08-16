@@ -88,7 +88,7 @@ spinlock_t tb_lock = SPIN_LOCK_UNLOCKED;
 uint8_t code_gen_buffer[CODE_GEN_BUFFER_SIZE] __attribute__((aligned (32)));
 uint8_t *code_gen_ptr;
 
-int phys_ram_size;
+unsigned long phys_ram_size;
 int phys_ram_fd;
 uint8_t *phys_ram_base;
 uint8_t *phys_ram_dirty;
@@ -2090,7 +2090,7 @@ ram_addr_t qemu_ram_alloc(unsigned int size)
 {
     ram_addr_t addr;
     if ((phys_ram_alloc_offset + size) >= phys_ram_size) {
-        fprintf(stderr, "Not enough memory (requested_size = %u, max memory = %d)\n",
+        fprintf(stderr, "Not enough memory (requested_size = %u, max memory = %lu)\n",
                 size, phys_ram_size);
         abort();
     }

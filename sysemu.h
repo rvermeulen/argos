@@ -69,7 +69,7 @@ int tap_win32_init(VLANState *vlan, const char *ifname);
 /* SLIRP */
 void do_info_slirp(void);
 
-extern int ram_size;
+extern unsigned long ram_size;
 extern int bios_size;
 extern int rtc_utc;
 extern int rtc_start_date;
