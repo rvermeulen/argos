@@ -183,11 +183,11 @@ static int boot_device2nibble(char boot_device)
 }
 
 /* hd_table must contain 4 block drivers */
-static void cmos_init(int ram_size, const char *boot_device, BlockDriverState **hd_table)
+static void cmos_init(unsigned long ram_size, const char *boot_device, BlockDriverState **hd_table)
 {
     RTCState *s = rtc_state;
     int nbds, bds[3] = { 0, };
-    int val;
+    unsigned long val;
     int fd0, fd1, nb;
     int i;
 

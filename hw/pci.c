@@ -185,7 +185,7 @@ PCIDevice *pci_register_device(PCIBus *bus, const char *name,
 }
 
 void pci_register_io_region(PCIDevice *pci_dev, int region_num,
-                            uint32_t size, int type,
+                            unsigned long size, int type,
                             PCIMapIORegionFunc *map_func)
 {
     PCIIORegion *r;
@@ -588,10 +588,10 @@ static void pci_info_device(PCIDevice *d)
         if (r->size != 0) {
             term_printf("      BAR%d: ", i);
             if (r->type & PCI_ADDRESS_SPACE_IO) {
-                term_printf("I/O at 0x%04x [0x%04x].\n",
+                term_printf("I/O at 0x%04lx [0x%04lx].\n",
                        r->addr, r->addr + r->size - 1);
             } else {
-                term_printf("32 bit memory at 0x%08x [0x%08x].\n",
+                term_printf("32 bit memory at 0x%08lx [0x%08lx].\n",
                        r->addr, r->addr + r->size - 1);
             }
         }

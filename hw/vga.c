@@ -1793,7 +1793,7 @@ static void vga_map(PCIDevice *pci_dev, int region_num,
 }
 
 void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base,
-                     unsigned long vga_ram_offset, int vga_ram_size)
+                     unsigned long vga_ram_offset, unsigned long vga_ram_size)
 {
     int i, j, v, b;
 
@@ -1964,7 +1964,7 @@ static void vga_mm_init(VGAState *s, target_phys_addr_t vram_base,
 }
 
 int isa_vga_init(DisplayState *ds, uint8_t *vga_ram_base,
-                 unsigned long vga_ram_offset, int vga_ram_size)
+                 unsigned long vga_ram_offset, unsigned long vga_ram_size)
 {
     VGAState *s;
 
@@ -1986,7 +1986,7 @@ int isa_vga_init(DisplayState *ds, uint8_t *vga_ram_base,
 }
 
 int isa_vga_mm_init(DisplayState *ds, uint8_t *vga_ram_base,
-                    unsigned long vga_ram_offset, int vga_ram_size,
+                    unsigned long vga_ram_offset, unsigned long vga_ram_size,
                     target_phys_addr_t vram_base, target_phys_addr_t ctrl_base,
                     int it_shift)
 {
@@ -2010,7 +2010,7 @@ int isa_vga_mm_init(DisplayState *ds, uint8_t *vga_ram_base,
 }
 
 int pci_vga_init(PCIBus *bus, DisplayState *ds, uint8_t *vga_ram_base,
-                 unsigned long vga_ram_offset, int vga_ram_size,
+                 unsigned long vga_ram_offset, unsigned long vga_ram_size,
                  unsigned long vga_bios_offset, int vga_bios_size)
 {
     PCIVGAState *d;

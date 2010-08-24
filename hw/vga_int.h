@@ -82,7 +82,7 @@
 #define VGA_STATE_COMMON                                                \
     uint8_t *vram_ptr;                                                  \
     unsigned long vram_offset;                                          \
-    unsigned int vram_size;                                             \
+    unsigned long vram_size;                                             \
     unsigned long bios_offset;                                          \
     unsigned int bios_size;                                             \
     target_phys_addr_t base_ctrl;                                       \
@@ -161,7 +161,7 @@ static inline int c6_to_8(int v)
 }
 
 void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base,
-                     unsigned long vga_ram_offset, int vga_ram_size);
+                     unsigned long vga_ram_offset, unsigned long vga_ram_size);
 void vga_init(VGAState *s);
 uint32_t vga_mem_readb(void *opaque, target_phys_addr_t addr, argos_rtag_t *tag);
 void vga_mem_writeb(void *opaque, target_phys_addr_t addr, uint32_t val, const argos_rtag_t *tag);
