@@ -20,8 +20,8 @@ typedef void PCIMapIORegionFunc(PCIDevice *pci_dev, int region_num,
 #define PCI_ADDRESS_SPACE_MEM_PREFETCH	0x08
 
 typedef struct PCIIORegion {
-    unsigned long addr; /* current PCI mapping address. -1 means not mapped */
-    unsigned long size;
+    uint32_t addr; /* current PCI mapping address. -1 means not mapped */
+    uint32_t size;
     uint8_t type;
     PCIMapIORegionFunc *map_func;
 } PCIIORegion;
@@ -71,7 +71,7 @@ PCIDevice *pci_register_device(PCIBus *bus, const char *name,
                                PCIConfigWriteFunc *config_write);
 
 void pci_register_io_region(PCIDevice *pci_dev, int region_num,
-                            unsigned long size, int type,
+                            uint32_t size, int type,
                             PCIMapIORegionFunc *map_func);
 
 uint32_t pci_default_read_config(PCIDevice *d,
