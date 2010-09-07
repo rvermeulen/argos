@@ -5,6 +5,9 @@ LoadLibraryA
 LoadLibraryExA
 LoadLibraryW
 LoadLibraryExW
+# download_exec payload
+GetProcAddress
+GetSystemDirectoryA
 #CreateProcessA
 #WaitForSingleObject
 [ws2_32.dll]
@@ -14,3 +17,5 @@ bind
 listen
 accept
 closesocket
+[urlmon.dll]
+URLDownloadToFileA
