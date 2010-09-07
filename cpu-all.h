@@ -878,12 +878,19 @@ int argos_cpu_inw(CPUState *env, int addr, argos_rtag_t *tag);
 int argos_cpu_inl(CPUState *env, int addr, argos_rtag_t *tag);
 #endif
 
+#if USE_KQEMU
+typedef uint32_t ram_addr_t;
+#else
+typedef unsigned long ram_addr_t;
+#endif
+
 /* memory API */
 
-extern unsigned long phys_ram_size;
+extern ram_addr_t phys_ram_size;
 extern int phys_ram_fd;
 extern uint8_t *phys_ram_base;
 extern uint8_t *phys_ram_dirty;
+extern ram_addr_t ram_size;
 
 /* physical memory access */
 #define TLB_INVALID_MASK   (1 << 3)
@@ -905,10 +912,10 @@ typedef void CPUWriteMemoryFunc(void *opaque, target_phys_addr_t addr, uint32_t 
 typedef uint32_t CPUReadMemoryFunc(void *opaque, target_phys_addr_t addr, argos_rtag_t *tag);
 
 void cpu_register_physical_memory(target_phys_addr_t start_addr,
-                                  unsigned long size,
-                                  unsigned long phys_offset);
-uint32_t cpu_get_physical_page_desc(target_phys_addr_t addr);
-ram_addr_t qemu_ram_alloc(unsigned int size);
+                                  ram_addr_t size,
+                                  ram_addr_t phys_offset);
+ram_addr_t cpu_get_physical_page_desc(target_phys_addr_t addr);
+ram_addr_t qemu_ram_alloc(ram_addr_t size);
 void qemu_ram_free(ram_addr_t addr);
 int cpu_register_io_memory(int io_index,
                            CPUReadMemoryFunc **mem_read,
@@ -964,6 +971,11 @@ static inline int cpu_physical_memory_is_dirty(ram_addr_t addr)
 static inline int cpu_physical_memory_get_dirty(ram_addr_t addr,
                                                 int dirty_flags)
 {
+#if 0
+    extern FILE * stderr;
+    fprintf(stderr, "cpu_physical_memory_get_dirty: 0x%08lx %i 0x%08lx\n",
+            addr, dirty_flags, addr >> TARGET_PAGE_BITS);
+#endif
     return phys_ram_dirty[addr >> TARGET_PAGE_BITS] & dirty_flags;
 }
 

@@ -639,7 +639,7 @@ static void cirrus_invalidate_region(CirrusVGAState * s, int off_begin,
 
     for (y = 0; y < lines; y++) {
 	off_cur = off_begin;
-	off_cur_end = off_cur + bytesperline;
+	off_cur_end = (off_cur + bytesperline) & s->cirrus_addr_mask;
 	off_cur &= TARGET_PAGE_MASK;
 	while (off_cur < off_cur_end) {
 	    cpu_physical_memory_set_dirty(s->vram_offset + off_cur);
@@ -654,7 +654,8 @@ static int cirrus_bitblt_common_patterncopy(CirrusVGAState * s,
 {
     uint8_t *dst;
 
-    dst = s->vram_ptr + s->cirrus_blt_dstaddr;
+    dst = s->vram_ptr + (s->cirrus_blt_dstaddr & s->cirrus_addr_mask);
+
     (*s->cirrus_rop) (s, dst, src,
                       s->cirrus_blt_dstpitch, 0,
                       s->cirrus_blt_width, s->cirrus_blt_height);
@@ -671,7 +672,7 @@ static int cirrus_bitblt_solidfill(CirrusVGAState *s, int blt_rop)
     cirrus_fill_t rop_func;
 
     rop_func = cirrus_fill[rop_to_index[blt_rop]][s->cirrus_blt_pixelwidth - 1];
-    rop_func(s, s->vram_ptr + s->cirrus_blt_dstaddr,
+    rop_func(s, s->vram_ptr + (s->cirrus_blt_dstaddr & s->cirrus_addr_mask),
              s->cirrus_blt_dstpitch,
              s->cirrus_blt_width, s->cirrus_blt_height);
     cirrus_invalidate_region(s, s->cirrus_blt_dstaddr,
@@ -690,8 +691,8 @@ static int cirrus_bitblt_solidfill(CirrusVGAState *s, int blt_rop)
 static int cirrus_bitblt_videotovideo_patterncopy(CirrusVGAState * s)
 {
     return cirrus_bitblt_common_patterncopy(s,
-					    s->vram_ptr +
-                                            (s->cirrus_blt_srcaddr & ~7));
+					    s->vram_ptr + ((s->cirrus_blt_srcaddr & ~7) &
+                                            s->cirrus_addr_mask));
 }
 
 static void cirrus_do_copy(CirrusVGAState *s, int dst, int src, int w, int h)
@@ -741,8 +742,10 @@ static void cirrus_do_copy(CirrusVGAState *s, int dst, int src, int w, int h)
     if (notify)
 	vga_hw_update();
 
-    (*s->cirrus_rop) (s, s->vram_ptr + s->cirrus_blt_dstaddr,
-		      s->vram_ptr + s->cirrus_blt_srcaddr,
+    (*s->cirrus_rop) (s, s->vram_ptr +
+		      (s->cirrus_blt_dstaddr & s->cirrus_addr_mask),
+		      s->vram_ptr +
+		      (s->cirrus_blt_srcaddr & s->cirrus_addr_mask),
 		      s->cirrus_blt_dstpitch, s->cirrus_blt_srcpitch,
 		      s->cirrus_blt_width, s->cirrus_blt_height);
 
@@ -801,8 +804,9 @@ static void cirrus_bitblt_cputovideo_next(CirrusVGAState * s)
         } else {
             /* at least one scan line */
             do {
-                (*s->cirrus_rop)(s, s->vram_ptr + s->cirrus_blt_dstaddr,
-                                 s->cirrus_bltbuf, 0, 0, s->cirrus_blt_width, 1);
+                (*s->cirrus_rop)(s, s->vram_ptr +
+                                 (s->cirrus_blt_dstaddr & s->cirrus_addr_mask),
+                                  s->cirrus_bltbuf, 0, 0, s->cirrus_blt_width, 1);
                 cirrus_invalidate_region(s, s->cirrus_blt_dstaddr, 0,
                                          s->cirrus_blt_width, 1);
                 s->cirrus_blt_dstaddr += s->cirrus_blt_dstpitch;
@@ -1924,7 +1928,7 @@ static void cirrus_mem_writeb_mode4and5_8bpp(CirrusVGAState * s,
     unsigned val = mem_value;
     uint8_t *dst;
 
-    dst = s->vram_ptr + offset;
+    dst = s->vram_ptr + (offset &= s->cirrus_addr_mask);
     for (x = 0; x < 8; x++) {
 	if (val & 0x80) {
 	    *dst = s->cirrus_shadow_gr1;
@@ -1947,7 +1951,7 @@ static void cirrus_mem_writeb_mode4and5_16bpp(CirrusVGAState * s,
     unsigned val = mem_value;
     uint8_t *dst;
 
-    dst = s->vram_ptr + offset;
+    dst = s->vram_ptr + (offset &= s->cirrus_addr_mask);
     for (x = 0; x < 8; x++) {
 	if (val & 0x80) {
 	    *dst = s->cirrus_shadow_gr1;
@@ -3192,7 +3196,7 @@ static void cirrus_init_common(CirrusVGAState * s, int device_id, int is_pci)
  ***************************************/
 
 void isa_cirrus_vga_init(DisplayState *ds, uint8_t *vga_ram_base,
-                         unsigned long vga_ram_offset, unsigned long vga_ram_size)
+                         ram_addr_t vga_ram_offset, int vga_ram_size)
 {
     CirrusVGAState *s;
 
@@ -3232,7 +3236,7 @@ static void cirrus_pci_mmio_map(PCIDevice *d, int region_num,
 }
 
 void pci_cirrus_vga_init(PCIBus *bus, DisplayState *ds, uint8_t *vga_ram_base,
-                         unsigned long vga_ram_offset, unsigned long vga_ram_size)
+                         ram_addr_t vga_ram_offset, int vga_ram_size)
 {
     PCICirrusVGAState *d;
     uint8_t *pci_conf;

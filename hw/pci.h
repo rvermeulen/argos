@@ -103,7 +103,7 @@ void *lsi_scsi_init(PCIBus *bus, int devfn);
 
 /* vmware_vga.c */
 void pci_vmsvga_init(PCIBus *bus, DisplayState *ds, uint8_t *vga_ram_base,
-                     unsigned long vga_ram_offset, unsigned long vga_ram_size);
+                     unsigned long vga_ram_offset, int vga_ram_size);
 
 /* usb-uhci.c */
 void usb_uhci_piix3_init(PCIBus *bus, int devfn);

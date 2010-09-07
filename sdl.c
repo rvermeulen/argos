@@ -60,7 +60,9 @@ static void sdl_resize(DisplayState *ds, int w, int h)
 {
     int flags;
 
-    //    printf("resizing to %d %d\n", w, h);
+#if 0
+    fprintf(stderr, "Resizing screen to %d %d\n", w, h);
+#endif
 
     flags = SDL_HWSURFACE|SDL_ASYNCBLIT|SDL_HWACCEL;
     if (gui_fullscreen)

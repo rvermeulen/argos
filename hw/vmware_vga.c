@@ -57,7 +57,7 @@ struct vmsvga_state_s {
 
 #ifndef EMBED_STDVGA
     DisplayState *ds;
-    unsigned long vram_size;
+    int vram_size;
 #endif
     uint8_t *vram;
 
@@ -1082,7 +1082,7 @@ static int vmsvga_load(struct vmsvga_state_s *s, QEMUFile *f)
 
 static void vmsvga_init(struct vmsvga_state_s *s, DisplayState *ds,
                 uint8_t *vga_ram_base, unsigned long vga_ram_offset,
-                unsigned long vga_ram_size)
+                int vga_ram_size)
 {
     int iomemtype;
     s->ds = ds;
@@ -1160,7 +1160,7 @@ static int pci_vmsvga_load(QEMUFile *f, void *opaque, int version_id)
 #define PCI_CLASS_HEADERTYPE_00h	0x00
 
 void pci_vmsvga_init(PCIBus *bus, DisplayState *ds, uint8_t *vga_ram_base,
-                     unsigned long vga_ram_offset, unsigned long vga_ram_size)
+                     unsigned long vga_ram_offset, int vga_ram_size)
 {
     struct pci_vmsvga_state_s *s;
 

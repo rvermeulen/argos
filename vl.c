@@ -164,7 +164,7 @@ int inet_aton(const char *cp, struct in_addr *ia);
     #endif
 #else
     #if HOST_X86_64
-        #define PHYS_RAM_MAX_SIZE (1280 * 1024 * 1024) // 1.25GB RAM + up to 1.25GB MEMMAP 
+        #define PHYS_RAM_MAX_SIZE ( 4L * 1024L * 1024L * 1024L ) // 3.2TB ram + up to 12.8TB MEMMAP
     #else
         #define PHYS_RAM_MAX_SIZE (1280 * 1024 * 1024) // 1.25GB RAM + up to 1.25GB MEMMAP 
     #endif
@@ -200,7 +200,7 @@ static DisplayState display_state;
 int nographic;
 const char* keyboard_layout = NULL;
 int64_t ticks_per_sec;
-unsigned long ram_size;
+ram_addr_t ram_size;
 int pit_min_timer_count = 0;
 int nb_nics;
 NICInfo nd_table[MAX_NICS];
@@ -7641,7 +7641,8 @@ static int ram_get_page(QEMUFile *f, uint8_t *buf, int len)
 
 static int ram_load_v1(QEMUFile *f, void *opaque)
 {
-    int i, ret;
+    int ret;
+    ram_addr_t i;
 
     if (qemu_get_be32(f) != phys_ram_size)
         return -EINVAL;
@@ -7777,7 +7778,7 @@ static void ram_decompress_close(RamDecompressState *s)
 
 static void ram_save(QEMUFile *f, void *opaque)
 {
-    int i;
+    ram_addr_t i;
     RamCompressState s1, *s = &s1;
     uint8_t buf[10];
 
@@ -7822,7 +7823,7 @@ static int ram_load(QEMUFile *f, void *opaque, int version_id)
 {
     RamDecompressState s1, *s = &s1;
     uint8_t buf[10];
-    int i;
+    ram_addr_t i;
 
     if (version_id == 1)
         return ram_load_v1(f, opaque);
@@ -7839,7 +7840,7 @@ static int ram_load(QEMUFile *f, void *opaque, int version_id)
         }
         if (buf[0] == 0) {
             if (ram_decompress_buf(s, phys_ram_base + i, BDRV_HASH_BLOCK_SIZE) < 0) {
-                fprintf(stderr, "Error while reading ram block address=0x%08x", i);
+                fprintf(stderr, "Error while reading ram block address=0x%08lx", i);
                 goto error;
             }
         } else
@@ -9333,13 +9334,37 @@ int main(int argc, char **argv)
                 break;
             case QEMU_OPTION_m:
                 {
-                    unsigned long ram_size_in_mb = strtoul(optarg, NULL, 10);
-                    if ( ram_size_in_mb == ULONG_MAX && errno == ERANGE )
+					char * optional_size_specifier;
+                    ram_addr_t value = strtoul(optarg, &optional_size_specifier, 10);
+                    if ( value == ULONG_MAX && errno == ERANGE )
                     {
                         fprintf(stderr, "The specified ram value is out of range!");
                         exit(1);
                     }
-                    ram_size = ram_size_in_mb * 1024 * 1024;
+
+ 					switch (*optional_size_specifier) {
+                		case 0: case 'M': case 'm':
+                    		value <<= 20;
+                    	break;
+                		case 'G': case 'g':
+                    		value <<= 30;
+                    	break;
+                		default:
+                    		value <<= 20;
+						break;
+                	}
+
+					/* On 32-bit hosts, QEMU is limited by virtual address space */
+                	if (value > (2047 << 20)
+#ifndef USE_KQEMU
+                    && HOST_LONG_BITS == 32
+#endif
+                    ) {
+                    	fprintf(stderr, "qemu: at most 2047 MB RAM can be simulated\n");
+                    	exit(1);
+                	}
+
+                    ram_size = value;
                     if (ram_size == 0)
                         help(1);
                     if (ram_size > PHYS_RAM_MAX_SIZE) {
@@ -9824,6 +9849,14 @@ int main(int argc, char **argv)
 
     /* init the memory */
     phys_ram_size = ram_size + vga_ram_size + MAX_BIOS_SIZE;
+
+#if defined(TARGET_I386)
+    /* Extra ram for 4G memory hole */
+    if (ram_size > 0xe0000000) {
+        phys_ram_size += 0x20000000;
+    }
+#endif
+
 
     phys_ram_base = qemu_vmalloc(phys_ram_size);
     if (!phys_ram_base) {

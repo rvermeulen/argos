@@ -1527,12 +1527,28 @@ static void vga_draw_graphic(VGAState *s, int full_update)
         if (!(s->cr[0x17] & 2)) {
             addr = (addr & ~0x8000) | ((y1 & 2) << 14);
         }
+#if 0
+        fprintf(stderr, "vram_offset = 0x%08lx addr = 0x%08x "
+                "masked addr = 0x%08x masked addr + bwidth = 0x%08x\n",
+            s->vram_offset, addr, (addr & TARGET_PAGE_MASK),
+            (addr + bwidth -1) & TARGET_PAGE_MASK);
+#endif
         page0 = s->vram_offset + (addr & TARGET_PAGE_MASK);
         page1 = s->vram_offset + ((addr + bwidth - 1) & TARGET_PAGE_MASK);
+#if 0
+        fprintf(stderr, "page0 = 0x%08x page1 = 0x%08x\n",
+                page0, page1);
+#endif
+
         update = full_update |
-            cpu_physical_memory_get_dirty(page0, VGA_DIRTY_FLAG) |
-            cpu_physical_memory_get_dirty(page1, VGA_DIRTY_FLAG);
+            cpu_physical_memory_get_dirty((uint32_t)page0, VGA_DIRTY_FLAG) |
+            cpu_physical_memory_get_dirty((uint32_t)page1, VGA_DIRTY_FLAG);
         if ((page1 - page0) > TARGET_PAGE_SIZE) {
+#if 0
+            fprintf(stderr, "vga_draw_graphics calls "
+                    "cpu_physical_memory_get_dirty(0x%x)\n",
+                    page0 + TARGET_PAGE_SIZE);
+#endif
             /* if wide line, can use another page */
             update |= cpu_physical_memory_get_dirty(page0 + TARGET_PAGE_SIZE,
                                                     VGA_DIRTY_FLAG);
@@ -1793,7 +1809,7 @@ static void vga_map(PCIDevice *pci_dev, int region_num,
 }
 
 void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base,
-                     unsigned long vga_ram_offset, unsigned long vga_ram_size)
+                     ram_addr_t vga_ram_offset, int vga_ram_size)
 {
     int i, j, v, b;
 
@@ -1964,7 +1980,7 @@ static void vga_mm_init(VGAState *s, target_phys_addr_t vram_base,
 }
 
 int isa_vga_init(DisplayState *ds, uint8_t *vga_ram_base,
-                 unsigned long vga_ram_offset, unsigned long vga_ram_size)
+                 unsigned long vga_ram_offset, int vga_ram_size)
 {
     VGAState *s;
 
@@ -1986,7 +2002,7 @@ int isa_vga_init(DisplayState *ds, uint8_t *vga_ram_base,
 }
 
 int isa_vga_mm_init(DisplayState *ds, uint8_t *vga_ram_base,
-                    unsigned long vga_ram_offset, unsigned long vga_ram_size,
+                    unsigned long vga_ram_offset, int vga_ram_size,
                     target_phys_addr_t vram_base, target_phys_addr_t ctrl_base,
                     int it_shift)
 {
@@ -2010,7 +2026,7 @@ int isa_vga_mm_init(DisplayState *ds, uint8_t *vga_ram_base,
 }
 
 int pci_vga_init(PCIBus *bus, DisplayState *ds, uint8_t *vga_ram_base,
-                 unsigned long vga_ram_offset, unsigned long vga_ram_size,
+                 unsigned long vga_ram_offset, int vga_ram_size,
                  unsigned long vga_bios_offset, int vga_bios_size)
 {
     PCIVGAState *d;
