@@ -472,13 +472,17 @@ void argos_tracksc_check_function_call( CPUX86State * env)
 
     if ( argos_tracksc_is_tracking(env) && in_shellcode_context(env) )
     {
+        // Are we calling code outside the payload?
         if ( !argos_dest_pc_isdirty(env, env->eip))
         {
             // We are only interested in user-mode functions calls.
+            // NOTE: This comparison might be incorrect when different addressing modes
+            // like PAE are enabled.
             if ( env->eip < 0x80000000 )
             {
                 if (argos_tracksc_whitelist)
                 {
+                    // Did the shell-code made the call.
                     if ( env->shellcode_context.call_level == 0 )
                     {
                         /*clock_t begin, end; begin = end = (clock_t) -1;
@@ -490,11 +494,12 @@ void argos_tracksc_check_function_call( CPUX86State * env)
                         {
                             argos_logf("Failed to retrieve clock ticks.\n");
                         }*/
-                        // Raise call-level to 1 for calls made by the i
+                        // Raise call-level to 1 for calls made by the
                         // shell-code to external functions
                         env->shellcode_context.call_level++;
                         save_return_address(env);
 
+                        // Find the module coressponding to the current program counter.
                         argos_tracksc_imported_module * module =
                             find_module(env, env->eip);
                         if ( module )
@@ -526,6 +531,10 @@ void argos_tracksc_check_function_call( CPUX86State * env)
                                                 // Raise call-level to 2 for
                                                 // LoadLibrary calls.
                                                 env->shellcode_context.call_level++;
+                                            }
+                                            else
+                                            {
+                                                argos_logf("Shell-code called %s\n", function->name);
                                             }
 
                                             //env->shellcode_context.single_step = 0;
@@ -1157,6 +1166,7 @@ static void get_imported_modules(CPUX86State * env)
                 goto next_module;
             }
 
+            argos_logf("Found module %s.\n", module_basename);
             if ( tail )
             {
                 tail = slist_add_after(tail, imported_module);
@@ -1610,6 +1620,7 @@ void argos_tracksc_check_for_return(CPUX86State * env)
         if ( env->shellcode_context.saved_return_address != 0
                 && env->shellcode_context.saved_return_address == env->eip )
         {
+            // Are we returning from a loadlibray function?
             if ( env->shellcode_context.call_level == 2 )
             {
                 /*clock_t begin, end; begin = end = (clock_t)-1;
