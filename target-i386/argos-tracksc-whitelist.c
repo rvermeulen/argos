@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include "argos-common.h"
 #include "argos-utility.h"
 #include "argos-tracksc-whitelist.h"
@@ -10,261 +11,556 @@
 #define MAX_MODULE_NAME_LENGTH_IN_CHARACTERS 260
 #define MAX_FUNCTION_NAME_LENGTH_IN_CHARACTERS 260
 
-void skip_comment(FILE * file);
-int read_module_name(FILE * file, char * buffer, int max_number_of_characters_in_buffer);
-int read_function_name(FILE * file, char * buffer, int max_number_of_characters_in_buffer);
+typedef enum {
+    EXPECTING_MODULE_OR_COMMENT,
+    EXPECTING_FUNCTION_OR_COMMENT,
+    EXPECTING_MODULE_OR_FUNCTION_OR_COMMENT,
+    PARSING_MODULE,
+    PARSING_FUNCTION,
+    PARSING_COMMENT
+} parser_state;
+
+typedef struct
+{
+    FILE * input;
+    char ch;
+    unsigned pos;
+    unsigned line;
+    parser_state state;
+    parser_state prev_state;
+    const char * error;
+} parser_context;
+
+static parser_context * create_parser(const char * input_file);
+static void destroy_parser(parser_context * ctx);
+static char peek(parser_context * ctx);
+static char read(parser_context * ctx);
+static int at_end_of_file(parser_context * ctx);
+static int is_end_of_file(char ch);
+static void skip_whitespace(parser_context * ctx);
+static void skip_comment(parser_context * ctx);
+static int skip_whitespace_until(parser_context * ctx, char stop_ch);
+static void restore_read(parser_context * ctx);
+
+char * read_identifier(parser_context * ctx);
+char * read_file_name(parser_context * ctx);
+char * read_module_name(parser_context * ctx);
+char * read_function_name(parser_context * ctx);
+
 void whitelist_deleter(void * whitelist_entry);
 
-slist_entry * argos_tracksc_read_whitelist(const char * whitelist_path)
+parser_context * create_parser(const char * input_file)
 {
-    FILE * whitelist_file = NULL;
-    int error_occurred = 0;
-
-    slist_entry * head_modules,* tail_modules, * tail_functions;
-    head_modules = tail_modules = tail_functions = NULL;
-
-
-    whitelist_file = fopen(whitelist_path, "r");
-    if ( whitelist_file )
+    if ( !input_file)
     {
-        char module_name[MAX_MODULE_NAME_LENGTH_IN_CHARACTERS + 1];
-        char function_name[MAX_FUNCTION_NAME_LENGTH_IN_CHARACTERS + 1];
-        int character = EOF;
-        while (  (character = fgetc(whitelist_file)) != EOF && !error_occurred)
+        return NULL;
+    }
+
+    parser_context * ctx =
+        (parser_context *)malloc(sizeof(parser_context));
+    if ( !ctx )
+    {
+        return NULL;
+    }
+
+    ctx->input = fopen(input_file, "r");
+    ctx->ch = -1;
+    ctx->pos = 0;
+    ctx->line = 1;
+    ctx->state = EXPECTING_MODULE_OR_COMMENT;
+    ctx->prev_state = EXPECTING_MODULE_OR_COMMENT;
+    ctx->error = NULL;
+
+    if ( !ctx->input )
+    {
+        free(ctx);
+        ctx = NULL;
+    }
+
+    return ctx;
+
+}
+
+void destroy_parser(parser_context * ctx)
+{
+    if ( ctx )
+    {
+        fclose(ctx->input);
+        free(ctx);
+    }
+}
+
+char peek(parser_context * ctx)
+{
+    char ch = fgetc(ctx->input);
+    ungetc(ch, ctx->input);
+
+    return ch;
+}
+
+char read(parser_context * ctx)
+{
+    char ch = fgetc(ctx->input);
+
+    if (ch == EOL)
+    {
+        ctx->pos = 0;
+        ctx->line++;
+    }
+    else
+        ctx->pos++;
+
+    ctx->ch = ch;
+
+    return ch;
+}
+
+int at_end_of_file(parser_context * ctx)
+{
+    return ctx->ch == EOF;
+}
+
+int is_end_of_file(char ch)
+{
+    return ch == EOF;
+}
+
+void skip_whitespace(parser_context * ctx)
+{
+    while( isspace(peek(ctx)) )
+    {
+        read(ctx);
+    }
+}
+
+int skip_whitespace_until(parser_context * ctx, char stop_ch)
+{
+    char ch = peek(ctx);
+    while( ch != EOF )
+    {
+        if (ch == stop_ch)
         {
-            switch(character)
+            read(ctx);
+            break;
+        }
+        else if ( isspace(ch) )
+            read(ctx);
+        else
+        {
+            ctx->error = "Invalid character, expected whitespace.";
+            return ch;
+        }
+
+        ch = peek(ctx);
+    }
+
+    return 0;
+}
+
+char * read_identifier(parser_context * ctx)
+{
+    char ch = peek(ctx);
+
+    if ( isalpha(ch) || ch == '_' )
+    {
+        char * identifier, * ptr;
+
+        identifier = ptr = (char *)malloc(256 * sizeof(char));
+
+        if ( !identifier )
+            return NULL;
+
+        *ptr++ = read(ctx);
+
+        ch = peek(ctx);
+        while( isalnum(ch) || ch == '_')
+        {
+            if ( ptr < (identifier + 255) )
             {
-                case '#':
-                    skip_comment(whitelist_file);
-                    break;
-                case '[':
-                    if ( read_module_name(whitelist_file, module_name, sizeof(module_name) - 1) > 0 )
+                *ptr++ = read(ctx);
+                ch = peek(ctx);
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        *ptr = '\0';
+        return identifier;
+    }
+
+    return NULL;
+}
+
+// Does not implement to correct parsing of filenames on windows,
+// but is sufficient for now.
+char * read_file_name(parser_context * ctx)
+{
+    char ch = peek(ctx);
+
+    if ( isalnum(ch) || ch == '_' || ch == '.' )
+    {
+        char * identifier, * ptr;
+
+        identifier = ptr = (char *)malloc(256 * sizeof(char));
+
+        if ( !identifier )
+            return NULL;
+
+        *ptr++ = read(ctx);
+
+        ch = peek(ctx);
+        while( isalnum(ch) || ch == '_' || ch == '.')
+        {
+            if ( ptr < (identifier + 255) )
+            {
+                *ptr++ = read(ctx);
+                ch = peek(ctx);
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        *ptr = '\0';
+        return identifier;
+    }
+
+    return NULL;
+}
+
+void restore_read(parser_context * ctx)
+{
+    ungetc(ctx->ch, ctx->input);
+}
+
+void argos_tracksc_print_whitelist(argos_tracksc_whitelist * whitelist)
+{
+    slist_entry * module_cursor = whitelist;
+    argos_logf("Argos shell-code tracking whitelist:\n");
+    while (module_cursor)
+    {
+        argos_tracksc_whitelist_entry * entry = slist_get_data(module_cursor);
+        if (entry)
+        {
+            slist_entry * function_cursor = entry->functions;
+            argos_logf("[%s]\n", entry->module_name);
+
+            while ( function_cursor )
+            {
+                const char * function_name = 
+                    (const char *)slist_get_data(function_cursor);
+                if ( function_name )
+                {
+                    argos_logf("%s\n", function_name);
+                }
+                else
+                {
+                    argos_logf("Skipping NULL function name!\n");
+                }
+
+                function_cursor = slist_next(function_cursor);
+            }
+        }
+        else
+        {
+            argos_logf("Skipping NULL whitelist entry!\n");
+        }
+
+        module_cursor = slist_next(module_cursor);
+    }
+}
+
+argos_tracksc_whitelist * argos_tracksc_read_whitelist(
+        const char * whitelist_path)
+{
+    parser_context * ctx;
+
+    argos_tracksc_whitelist * whitelist = NULL, * whitelist_cursor = NULL;
+    slist_entry * last_added_function = NULL;
+    argos_tracksc_whitelist_entry * current_entry = NULL;
+
+    whitelist = slist_create();
+    if (!whitelist)
+    {
+        argos_logf("Failed to allocate memory for shell-code tracker "
+                "white list\n");
+        return NULL;
+    }
+
+    whitelist_cursor = whitelist;
+    ctx = create_parser(whitelist_path);
+    if ( ctx )
+    {
+        while ( !is_end_of_file(peek(ctx)) )
+        {
+            switch(ctx->state)
+            {
+                case EXPECTING_MODULE_OR_COMMENT:
                     {
-                        //argos_logf("Found module %s in tracksc whitelist.\n", module_name);
-
-                        argos_tracksc_whitelist_entry * new_entry = (argos_tracksc_whitelist_entry*)malloc(sizeof(argos_tracksc_whitelist_entry));
-                        if ( !new_entry )
+                        skip_whitespace(ctx);
+                        switch(peek(ctx))
                         {
-                            argos_logf("Failed to create tracksc whitelist entry!!!\n");
-                            exit(1);
-                        }
-
-                        new_entry->module_name = strdup(module_name);
-                        if ( !new_entry->module_name )
+                            case '#':
+                                ctx->prev_state = ctx->state;
+                                ctx->state = PARSING_COMMENT;
+                                break;
+                            case '[':
+                                ctx->prev_state = ctx->state;
+                                ctx->state = PARSING_MODULE;
+                                break;
+                            default:
+                                ctx->error = "Expected module or comment.";
+                                goto parse_error;
+                        };
+                    }
+                    break;
+                case EXPECTING_MODULE_OR_FUNCTION_OR_COMMENT:
+                    {
+                        skip_whitespace(ctx);
+                        switch(peek(ctx))
                         {
-                            argos_logf("Failed to duplicate string!!!\n");
-                            exit(1);
-                        }
-                        new_entry->functions = NULL;
-
-                        if ( tail_modules )
+                            case '#':
+                                ctx->prev_state = ctx->state;
+                                ctx->state = PARSING_COMMENT;
+                                break;
+                            case '[':
+                                ctx->prev_state = ctx->state;
+                                ctx->state = PARSING_MODULE;
+                                break;
+                            default:
+                                ctx->prev_state = ctx->state;
+                                ctx->state = PARSING_FUNCTION;
+                                break;
+                        };
+                    }
+                    break;
+                case PARSING_COMMENT:
+                    {
+                        skip_comment(ctx);
+                        ctx->state = ctx->prev_state;
+                    }
+                    break;
+                case PARSING_MODULE:
+                    {
+                        char * module_name = read_module_name(ctx);
+                        if ( module_name )
                         {
-                            tail_modules = slist_add_after(tail_modules, new_entry);
-                            if (!tail_modules)
+                            ctx->state =
+                                EXPECTING_MODULE_OR_FUNCTION_OR_COMMENT;
+
+                            current_entry =
+                                argos_tracksc_find_module_in_whitelist(
+                                        module_name, whitelist);
+
+                            if ( !current_entry )
                             {
-                                argos_logf("Failed to add list entry!!!\n");
-                                exit(1);
+                                current_entry =
+                                    (argos_tracksc_whitelist_entry*)
+                                    malloc(
+                                            sizeof(
+                                                argos_tracksc_whitelist_entry)
+                                            );
+
+                                if (!current_entry)
+                                {
+                                    argos_logf("Failed to allocated memory "
+                                            "for shell-code tracking "
+                                            "whitelist entry.\n");
+                                    free(module_name);
+                                    goto error;
+                                }
+
+                                current_entry->module_name = module_name;
+                                if (slist_get_data(whitelist_cursor) != NULL)
+                                {
+                                    whitelist_cursor =
+                                        slist_add_after(whitelist_cursor,
+                                                current_entry);
+
+                                    if (!whitelist_cursor)
+                                    {
+                                        free(module_name);
+                                        goto error;
+                                    }
+                                }
+                                else
+                                {
+                                    slist_set_data(whitelist_cursor,
+                                            current_entry);
+                                }
+                                last_added_function = NULL;
                             }
+                            else
+                            {
+                                last_added_function =
+                                    (current_entry->functions)?
+                                    slist_tail(current_entry->functions):NULL;
+                            }
+
                         }
                         else
                         {
-                            head_modules = tail_modules = slist_create();
-                            if ( !tail_modules )
-                            {
-                                argos_logf("Failed to create list!!!\n");
-                                exit(1);
-                            }
-
-                            slist_set_data(tail_modules, new_entry);
+                            goto parse_error;
                         }
-
-                        tail_functions = NULL;
-                    }
-                    else
-                    {
-                        argos_logf("Invalid module name specified in tracksc whitelist!!!\n");
-                        error_occurred++;
                     }
                     break;
-                default:
-                    if ( ungetc(character, whitelist_file) == character )
+                case PARSING_FUNCTION:
                     {
-                        if ( read_function_name(whitelist_file, function_name, sizeof(function_name) - 1) > 0 )
+                        char * function_name =
+                            read_function_name(ctx);
+                        if ( function_name )
                         {
-                            //argos_logf("Found function %s in tracksc whitelist.\n", function_name);
+                            ctx->state =
+                                EXPECTING_MODULE_OR_FUNCTION_OR_COMMENT;
 
-                            char * copy_of_function_name = strdup(function_name);
-                            if ( !copy_of_function_name )
+                            if ( last_added_function )
                             {
-                                argos_logf("Failed to duplicate string!!!\n");
-                                exit(1);
-                            }
+                                last_added_function =
+                                    slist_add_after(last_added_function,
+                                        function_name);
 
-                            if ( tail_functions )
-                            {
-                                tail_functions = slist_add_after(tail_functions, copy_of_function_name);
-                                if ( !tail_functions )
+                                if (!last_added_function)
                                 {
-                                    argos_logf("Failed to add list entry!!!\n");
-                                    exit(1);
+                                    goto error;
                                 }
                             }
                             else
                             {
-                                tail_functions = slist_create();
-                                if ( !tail_functions )
+                                current_entry->functions = last_added_function
+                                    = slist_create();
+                                if (last_added_function)
                                 {
-                                    argos_logf("Failed to create list!!!\n");
-                                    exit(1);
+                                    slist_set_data(last_added_function,
+                                            function_name);
                                 }
-
-                                slist_set_data(tail_functions, copy_of_function_name);
-                                argos_tracksc_whitelist_entry * entry = (argos_tracksc_whitelist_entry*)slist_get_data(tail_modules);
-                                if ( !entry )
+                                else
                                 {
-                                    argos_logf("Unexpected list data!!!\n");
-                                    exit(1);
+                                    goto error;
                                 }
-                                entry->functions = tail_functions;
                             }
-
                         }
                         else
                         {
-                            argos_logf("Invalid module name specified in tracksc whitelist!!!\n");
-                            error_occurred++;
+                            goto parse_error;
                         }
                     }
-                    else
-                    {
-                        argos_logf("Unable to restore first character of function name in input stream!!!\n");
-                        error_occurred++;
-                    }
                     break;
-            }
+                default:
+                    ctx->error = "Reached invalid parser state!";
+                    goto error;
+            };
         }
-       fclose(whitelist_file);
+        destroy_parser(ctx);
     }
-    return head_modules;
+    return whitelist;
+parse_error:
+    argos_logf("Parsing of whitelist failed with the error: %s\n"
+            "Char: '%c' Line %u Position %u.\n", ctx->error,
+            peek(ctx), ctx->line, ctx->pos);
+error:
+    argos_tracksc_destroy_whitelist(whitelist);
+    return NULL;
 }
 
-void skip_comment(FILE * file)
+void skip_comment(parser_context * ctx)
 {
     int character = EOF;
     do
     {
-        character = fgetc(file);
+        character = read(ctx);
     } while (character != EOF && character != EOL);
 }
 
-int read_module_name(FILE * file, char * buffer, int max_number_of_characters_in_buffer)
+char * read_module_name(parser_context * ctx)
 {
-    int number_of_read_characters = 0;
-    int found_end_of_module_name = 0;
-
-    int character = fgetc(file);
-    number_of_read_characters++;
-    while( character != EOF && character != EOL)
+    if ( read(ctx) == '[')
     {
-        if ( character == ']' )
-        {
-            found_end_of_module_name = 1;
-            break;
-        }
+        char * module_name = read_file_name(ctx);
 
-        if ( number_of_read_characters <= max_number_of_characters_in_buffer )
+        if ( module_name )
         {
-            buffer[number_of_read_characters-1] = character;
+            if ( peek(ctx)  == ']' )
+            {
+                read(ctx);
+                if (!skip_whitespace_until(ctx, EOL))
+                    return module_name;
+                else
+                    free(module_name);
+            }
+            else
+            {
+                free(module_name);
+                ctx->error = "Expected end of module definition.";
+            }
         }
-        else
-        {
-            break;
-        }
-        character = fgetc(file);
-        number_of_read_characters++;
-    }
-
-    while ( character != EOF && character != EOL )
-    {
-        character = fgetc(file);
-    }
-
-    if ( found_end_of_module_name )
-    {
-        buffer[number_of_read_characters-1] = '\0';
-        return number_of_read_characters;
     }
     else
     {
-        buffer[0] = '\0';
-        return -1;
+        ctx->error = "Expected begin of module definition.";
     }
+
+    return NULL;
 }
 
-int read_function_name(FILE * file, char * buffer, int max_number_of_characters_in_buffer)
+char * read_function_name(parser_context * ctx)
 {
-    int number_of_read_characters = 0;
-    int character = fgetc(file);
+    char * function_name = read_identifier(ctx);
 
-    number_of_read_characters++;
-    while( character != EOF && character != EOL)
+    if ( function_name )
     {
-        if ( character == ' ' || character == '\t' )
-        {
-            break;
-        }
-
-        if ( number_of_read_characters <= max_number_of_characters_in_buffer )
-        {
-            buffer[number_of_read_characters-1] = character;
-        }
+        if (!skip_whitespace_until(ctx, EOL))
+            return function_name;
         else
-        {
-            break;
-        }
-        character = fgetc(file);
-        number_of_read_characters++;
+            free(function_name);
     }
 
-    while ( character != EOF && character != EOL )
-    {
-        character = fgetc(file);
-    }
-
-    if ( number_of_read_characters > 0 )
-    {
-        buffer[number_of_read_characters-1] = '\0';
-    }
-    else
-    {
-        buffer[0] = '\0';
-    }
-    return number_of_read_characters;
+    return NULL;
 }
 
-argos_tracksc_whitelist_entry * argos_tracksc_find_module_in_whitelist(const char * module_name, slist_entry * whitelist)
+argos_tracksc_whitelist_entry * argos_tracksc_find_module_in_whitelist(
+        const char * module_name, argos_tracksc_whitelist * whitelist)
 {
     slist_entry * whitelist_cursor = whitelist;
     while ( whitelist_cursor )
     {
-        argos_tracksc_whitelist_entry * whitelist_entry = (argos_tracksc_whitelist_entry*)slist_get_data(whitelist_cursor);
-        if ( !strcasecmp(module_name, whitelist_entry->module_name) )
+        argos_tracksc_whitelist_entry * whitelist_entry =
+            (argos_tracksc_whitelist_entry*)slist_get_data(whitelist_cursor);
+        if ( whitelist_entry )
         {
-            return whitelist_entry;
-        }
+            if ( whitelist_entry->module_name )
+            {
+                if ( !strcasecmp(module_name, whitelist_entry->module_name) )
+                {
+                    return whitelist_entry;
+                }
+            }
+            /*else
+            {
+                argos_logf("Encountered NULL module name in whitelist entry!\n");
+            }*/
 
+        }
+        /*else
+        {
+            argos_logf("Encountered NULL whitelist entry!\n");
+        }*/
         whitelist_cursor = slist_next(whitelist_cursor);
     }
 
     return NULL;
 }
 
-int argos_tracksc_whitelist_function_in_whitelist_entry(const char * function_name, argos_tracksc_whitelist_entry * entry)
+int argos_tracksc_whitelist_function_in_whitelist_entry(
+        const char * function_name, argos_tracksc_whitelist_entry * entry)
 {
     slist_entry * function_cursor = entry->functions;
     while( function_cursor )
     {
-        const char * function_name_contained_in_entry = (const char *)slist_get_data(function_cursor);
+        const char * function_name_contained_in_entry =
+            (const char *)slist_get_data(function_cursor);
         if ( function_name_contained_in_entry )
         {
             if ( !strcasecmp(function_name, function_name_contained_in_entry) )
@@ -279,13 +575,15 @@ int argos_tracksc_whitelist_function_in_whitelist_entry(const char * function_na
     return 0;
 }
 
-void argos_tracksc_destroy_whitelist(slist_entry * whitelist)
+void argos_tracksc_destroy_whitelist(argos_tracksc_whitelist * whitelist)
 {
     slist_destroy(whitelist, whitelist_deleter);
 }
 
 void whitelist_deleter(void * whitelist_entry)
 {
-    free((void *)((argos_tracksc_whitelist_entry*)whitelist_entry)->module_name);
-    slist_destroy(((argos_tracksc_whitelist_entry*)whitelist_entry)->functions, free);
+    free((void *)
+            ((argos_tracksc_whitelist_entry*)whitelist_entry)->module_name);
+    slist_destroy(((argos_tracksc_whitelist_entry*)whitelist_entry)->functions,
+            free);
 }
