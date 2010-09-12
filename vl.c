@@ -273,7 +273,7 @@ int argos_instance_id = 0;
 char *argos_wprofile = NULL;
 int argos_tracksc = 0;
 const char * argos_tracksc_whitelist_path = NULL;
-slist_entry * argos_tracksc_whitelist = NULL;
+argos_tracksc_whitelist * argos_tracksc_loaded_whitelist = NULL;
 #ifdef ARGOS_NET_TRACKER
 FILE *argos_nt_fl = NULL;
 #endif
@@ -9872,10 +9872,16 @@ int main(int argc, char **argv)
 
     if ( argos_tracksc_whitelist_path )
     {
-        argos_tracksc_whitelist = argos_tracksc_read_whitelist(argos_tracksc_whitelist_path);
-        if ( !argos_tracksc_whitelist )
+        argos_tracksc_loaded_whitelist =
+            argos_tracksc_read_whitelist(argos_tracksc_whitelist_path);
+        if ( argos_tracksc_loaded_whitelist )
         {
-            fprintf(stderr, "Could not read tracksc whitelist %s\n", argos_tracksc_whitelist_path);
+            argos_logf("Successfully loaded whitelist.\n");
+        }
+        else
+        {
+            fprintf(stderr, "Could not read tracksc whitelist %s\n",
+                    argos_tracksc_whitelist_path);
             exit(1);
         }
     }

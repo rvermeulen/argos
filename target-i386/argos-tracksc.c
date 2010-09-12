@@ -123,9 +123,10 @@ void argos_tracksc_stop(CPUX86State * env)
     slist_destroy(env->shellcode_context.imported_modules,
             imported_module_deleter);
 
-    if ( argos_tracksc_whitelist )
+    argos_logf("Cleaning up shell-code tracking whitelist.\n");
+    if ( argos_tracksc_loaded_whitelist )
     {
-        argos_tracksc_destroy_whitelist(argos_tracksc_whitelist);
+        argos_tracksc_destroy_whitelist(argos_tracksc_loaded_whitelist);
     }
 }
 
@@ -476,12 +477,14 @@ void argos_tracksc_check_function_call( CPUX86State * env)
         if ( !argos_dest_pc_isdirty(env, env->eip))
         {
             // We are only interested in user-mode functions calls.
-            // NOTE: This comparison might be incorrect when different addressing modes
-            // like PAE are enabled.
+            // NOTE: This comparison might be incorrect when different
+            // addressing modes like PAE are enabled.
             if ( env->eip < 0x80000000 )
             {
-                if (argos_tracksc_whitelist)
+                if (argos_tracksc_loaded_whitelist)
                 {
+                    //argos_logf("Validating function call against tracking "
+                    //        "whitelist\n");
                     // Did the shell-code made the call.
                     if ( env->shellcode_context.call_level == 0 )
                     {
@@ -506,7 +509,8 @@ void argos_tracksc_check_function_call( CPUX86State * env)
                         {
                             argos_tracksc_whitelist_entry * whitelist_entry =
                                 argos_tracksc_find_module_in_whitelist(
-                                        module->name, argos_tracksc_whitelist);
+                                        module->name,
+                                        argos_tracksc_loaded_whitelist);
 
                             if ( whitelist_entry )
                             {
@@ -1056,7 +1060,7 @@ static uint32_t utf16_to_utf8(uint16_t * source, uint32_t source_length,
            destination[i] = '?';
        }
    }
-   destination[destination_size-1] = '\0';
+   destination[i] = '\0';
    return number_converted_characters;
 }
 
@@ -1166,7 +1170,7 @@ static void get_imported_modules(CPUX86State * env)
                 goto next_module;
             }
 
-            argos_logf("Found module %s.\n", module_basename);
+            //argos_logf("Found module %s.\n", module_basename);
             if ( tail )
             {
                 tail = slist_add_after(tail, imported_module);
