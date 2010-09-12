@@ -1,13 +1,15 @@
 # This whitelist contains the modules and the functions exported by the module
 # that are allowed to execute.
+
+# Default whitelisted exports that are used by almost all payloads.
 [kernel32.dll]
 LoadLibraryA
 LoadLibraryExA
 LoadLibraryW
 LoadLibraryExW
-# download_exec payload
-GetProcAddress
-GetSystemDirectoryA
+
+# Whitelist for the Metasploit bind_tcp payload.
+[kernel32.dll]
 #CreateProcessA
 #WaitForSingleObject
 [ws2_32.dll]
@@ -17,5 +19,11 @@ bind
 listen
 accept
 closesocket
+
+# Whitelist for the Metasploit dowload_exec payload.
+[kernel32.dll]
+GetProcAddress
+GetSystemDirectoryA
 [urlmon.dll]
 URLDownloadToFileA
+[JSCRIPT.dll]
