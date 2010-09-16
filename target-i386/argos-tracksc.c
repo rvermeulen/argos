@@ -227,10 +227,6 @@ void argos_tracksc_log_instruction(CPUX86State * env)
                     env->shellcode_context.trace_stage,
                     env->shellcode_context.instruction_stage);
 
-            /*fprintf(env->shellcode_context.logfile, "Stage %u -> %u\n", 
-                    env->shellcode_context.trace_stage,
-                    env->shellcode_context.instruction_stage);*/
-
             env->shellcode_context.trace_stage =
                 env->shellcode_context.instruction_stage;
         }
@@ -240,39 +236,25 @@ void argos_tracksc_log_instruction(CPUX86State * env)
         append_to_logfile(&env->shellcode_context, "0x%x ",
                 env->shellcode_context.executed_eip);
 
-        /*fprintf(env->shellcode_context.logfile, "0x%x ", 
-                env->shellcode_context.executed_eip);
-                */
-
         append_to_logfile(&env->shellcode_context, "\t");
-        //fprintf(env->shellcode_context.logfile, "\t");
 
         write_instruction_to_log(&env->shellcode_context);
 
         append_to_logfile(&env->shellcode_context, "\t");
-        //fprintf(env->shellcode_context.logfile, "\t");
         append_to_logfile(&env->shellcode_context, " ");
-        //fprintf(env->shellcode_context.logfile, " ");
 
         // Print the bytes of the instruction
         for (i = 0; i < env->shellcode_context.instruction.length; i++)
         {
             append_to_logfile(&env->shellcode_context, "%x ",
                     env->shellcode_context.instruction_bytes[i] & 0xFF);
-            //fprintf(env->shellcode_context.logfile, "%x ",
-            //        env->shellcode_context.instruction_bytes[i] & 0xFF);
         }
         append_to_logfile(&env->shellcode_context, "\t");
-        //fprintf(env->shellcode_context.logfile, "\t");
 
 #ifdef ARGOS_NET_TRACKER
         // Print the netidx's of the instruction bytes.
         for (i = 0; i < env->shellcode_context.instruction.length; i++)
         {
-            /*fprintf(env->shellcode_context.logfile, "[%u] ",
-                    ARGOS_GET_NETIDX(
-                        env->shellcode_context.instruction_netidx[i])
-                   );*/
             append_to_logfile(&env->shellcode_context, "[%u] ",
                     ARGOS_GET_NETIDX(
                         env->shellcode_context.instruction_netidx[i])
@@ -280,7 +262,6 @@ void argos_tracksc_log_instruction(CPUX86State * env)
         }
 
         append_to_logfile(&env->shellcode_context, "\t");
-        //fprintf(env->shellcode_context.logfile, "\t");
 #endif // ARGOS_NET_TRACKER
 
         // If the instruction performed a load,
@@ -289,16 +270,11 @@ void argos_tracksc_log_instruction(CPUX86State * env)
                 env->shellcode_context.executed_eip)
         {
 
-            /*fprintf(env->shellcode_context.logfile, " <- @0x%lx (0x%x) ",
-                    env->shellcode_context.load_addr,
-                    env->shellcode_context.load_value);
-                    */
             append_to_logfile(&env->shellcode_context, " <- @0x%lx (0x%x) ",
                     env->shellcode_context.load_addr,
                     env->shellcode_context.load_value);
 
             append_to_logfile(&env->shellcode_context, "\t");
-            //fprintf(env->shellcode_context.logfile, "\t");
 
 #ifdef ARGOS_NET_TRACKER
             // Print the netidx's belonging to the value loaded.
@@ -336,24 +312,17 @@ void argos_tracksc_log_instruction(CPUX86State * env)
                     if (env->shellcode_context.load_addr_type ==
                             ARGOS_HOST_VIRTUAL_ADDR)
                     {
-                        /*fprintf(env->shellcode_context.logfile, "@[%u] ",
-                                ARGOS_GET_NETIDX(*netidx));
-                                */
                         append_to_logfile(&env->shellcode_context, "@[%u] ",
                                 ARGOS_GET_NETIDX(*netidx));
                     }
                     else
                     {
-                        /* fprintf(env->shellcode_context.logfile, "[%u] ",
-                                ARGOS_GET_NETIDX(*netidx));
-                                */
                         append_to_logfile(&env->shellcode_context, "[%u] ",
                                 ARGOS_GET_NETIDX(*netidx));
                     }
                 }
                 else
                 {
-                    //fprintf(env->shellcode_context.logfile, "[%u] ", 0);
                     append_to_logfile(&env->shellcode_context, "[%u] ", 0);
 
                 }
@@ -371,15 +340,10 @@ void argos_tracksc_log_instruction(CPUX86State * env)
         if (env->shellcode_context.storedby_eip ==
                 env->shellcode_context.executed_eip)
         {
-            /*fprintf(env->shellcode_context.logfile, " -> @0x%lx (0x%x) ",
-                    env->shellcode_context.store_addr,
-                    env->shellcode_context.store_value);
-                    */
             append_to_logfile(&env->shellcode_context, " -> @0x%lx (0x%x) ",
                     env->shellcode_context.store_addr,
                     env->shellcode_context.store_value);
 
-            //fprintf(env->shellcode_context.logfile, "\t");
             append_to_logfile(&env->shellcode_context, "\t");
 
 #ifdef ARGOS_NET_TRACKER
@@ -411,24 +375,17 @@ void argos_tracksc_log_instruction(CPUX86State * env)
                     if (env->shellcode_context.store_addr_type ==
                             ARGOS_HOST_VIRTUAL_ADDR)
                     {
-                        /*fprintf(env->shellcode_context.logfile, "@[%u] ",
-                                ARGOS_GET_NETIDX(*netidx));
-                                */
                         append_to_logfile(&env->shellcode_context,
                                 "@[%u] ", ARGOS_GET_NETIDX(*netidx));
                     }
                     else
                     {
-                        /*fprintf(env->shellcode_context.logfile, "[%u] ",
-                                ARGOS_GET_NETIDX(*netidx));
-                                */
                         append_to_logfile(&env->shellcode_context, "[%u] ",
                                 ARGOS_GET_NETIDX(*netidx));
                     }
                 }
                 else
                 {
-                    //fprintf(env->shellcode_context.logfile, "[%u] ", 0);
                     append_to_logfile(&env->shellcode_context, "[%u] ", 0);
                 }
             }
@@ -439,9 +396,7 @@ void argos_tracksc_log_instruction(CPUX86State * env)
             env->shellcode_context.store_size = 0;
             env->shellcode_context.storedby_eip = 0;
         }
-        //fprintf(env->shellcode_context.logfile, "\n");
         append_to_logfile(&env->shellcode_context, "\n");
-        //fflush(env->shellcode_context.logfile);
 
         // We have logged the code.
         env->shellcode_context.logged = 0;
@@ -515,7 +470,8 @@ void argos_tracksc_check_function_call( CPUX86State * env)
                             if ( whitelist_entry )
                             {
                                 argos_tracksc_exported_function * function =
-                                    find_exported_function(env, module, env->eip);
+                                    find_exported_function(env, module,
+                                            env->eip);
 
                                 if ( function )
                                 {
@@ -705,8 +661,6 @@ static void write_instruction_to_log(argos_shellcode_context_t * context)
     if ( context->called_function && context->called_function->name
             && context->instruction.type == INSTRUCTION_TYPE_CALL )
     {
-        /*fprintf(context->logfile, "call %s!%s", context->called_function->module->name,
-                context->called_function->name);*/
         append_to_logfile(context, "call %s!%s",
                 context->called_function->module->name,
                 context->called_function->name);
@@ -714,8 +668,6 @@ static void write_instruction_to_log(argos_shellcode_context_t * context)
     else if ( context->called_function && context->called_function->name
             && context->instruction.type == INSTRUCTION_TYPE_JMP )
     {
-        /*fprintf(context->logfile, "jmp %s!%s", context->called_function->module->name,
-                context->called_function->name);*/
         append_to_logfile(context, "jmp %s!%s", 
                 context->called_function->module->name,
                 context->called_function->name);
@@ -723,10 +675,10 @@ static void write_instruction_to_log(argos_shellcode_context_t * context)
     else
     {
         char instruction_string[1024];
-        if (get_instruction_string(&context->instruction, FORMAT_INTEL, 0, instruction_string,
+        if (get_instruction_string(&context->instruction, FORMAT_INTEL, 0,
+                    instruction_string,
                     sizeof(instruction_string)))
         {
-            //fprintf(context->logfile, "%s", instruction_string);
             append_to_logfile(context, "%s", instruction_string);
         }
     }
@@ -1330,111 +1282,123 @@ static argos_tracksc_exported_function * find_exported_function(
 
             cursor = slist_next(cursor);
         }
+
     }
-    else
+
+    // We have deferred loading the exports in the analysis phase,
+    // search the export directory.
+    target_ulong function_address_table = module->function_address_table;
+    target_ulong function_ordinal_table = module->function_ordinal_table;
+    target_ulong function_name_table = module->function_name_table;
+
+    unsigned i = 0;
+    for(; i < module->number_of_functions; ++i)
     {
-        // We have deferred loading in the analysis phase, search the 
-        // export directory.
-        target_ulong function_address_table = module->function_address_table;
-        target_ulong function_ordinal_table = module->function_ordinal_table;
-        target_ulong function_name_table = module->function_name_table;
+        target_ulong function_ordinal_table_entry_offset =
+            i * sizeof(uint16_t);
+        target_ulong address_of_function_ordinal =
+            function_ordinal_table
+            + function_ordinal_table_entry_offset;
+        uint16_t * function_ordinal = (uint16_t *)
+            PHYS_ADDR(address_of_function_ordinal);
 
-        unsigned i = 0;
-        for(; i < module->number_of_functions; ++i)
+        if ( function_ordinal )
         {
-            argos_tracksc_exported_function * export =
-                (argos_tracksc_exported_function *)
-                malloc(sizeof(argos_tracksc_exported_function));
+            target_ulong function_address_table_entry_offset =
+                *function_ordinal * sizeof(uint32_t);
+            target_ulong address_of_function_address =
+                function_address_table
+                + function_address_table_entry_offset;
+            target_ulong * function_address =
+                (target_ulong*) PHYS_ADDR(address_of_function_address);
 
-            if ( export != NULL )
+            if ( function_address )
             {
-                export->module = module;
-
-                target_ulong function_ordinal_table_entry_offset =
-                    i * sizeof(uint16_t);
-                target_ulong address_of_function_ordinal =
-                    function_ordinal_table
-                    + function_ordinal_table_entry_offset;
-                uint16_t * function_ordinal = (uint16_t *)
-                    PHYS_ADDR(address_of_function_ordinal);
-
-                if ( function_ordinal )
+                if ((*function_address
+                    + module->begin_address) == address)
                 {
-                    export->ordinal = *function_ordinal;
+                    target_ulong function_name_table_entry_offset = i
+                        * sizeof(uint32_t);
+                    target_ulong address_of_function_name_rva =
+                        function_name_table
+                        + function_name_table_entry_offset;
+                    target_ulong * function_name_rva = (target_ulong*)
+                        PHYS_ADDR(address_of_function_name_rva);
 
-                    target_ulong function_address_table_entry_offset =
-                        export->ordinal * sizeof(uint32_t);
-                    target_ulong address_of_function_address =
-                        function_address_table
-                        + function_address_table_entry_offset;
-                    target_ulong * function_address =
-                        (target_ulong*) PHYS_ADDR(address_of_function_address);
-
-                    if ( function_address )
+                    if ( function_name_rva )
                     {
-                        export->address = *function_address
-                            + module->begin_address;
-                        if (export->address == address)
+                        target_ulong address_of_function_name = 
+                            module->begin_address + *function_name_rva;
+                        const char * function_name = (const char *)
+                            PHYS_ADDR(address_of_function_name);
+
+                        if ( function_name )
                         {
+                            argos_tracksc_exported_function * export =
+                                (argos_tracksc_exported_function *)
+                                malloc(sizeof(argos_tracksc_exported_function));
 
-                            target_ulong function_name_table_entry_offset = i
-                                * sizeof(uint32_t);
-                            target_ulong address_of_function_name_rva =
-                                function_name_table
-                                + function_name_table_entry_offset;
-                            target_ulong * function_name_rva = (target_ulong*)
-                                PHYS_ADDR(address_of_function_name_rva);
-
-                            if ( function_name_rva )
+                            if ( export != NULL )
                             {
-                                target_ulong address_of_function_name = 
-                                    module->begin_address + *function_name_rva;
-                                const char * function_name = (const char *)
-                                    PHYS_ADDR(address_of_function_name);
-
-                                if ( function_name )
+                                export->module = module;
+                                export->ordinal = *function_ordinal;
+                                export->name = strdup(function_name);
+                                export->address = address;
+                                if ( export->name != NULL )
                                 {
-                                    export->name = strdup(function_name);
-                                    if ( export->name != NULL )
+                                    if (!module->exports)
                                     {
-                                        return export;
+                                        module->exports = slist_create();
+                                        if (module->exports)
+                                        {
+                                            slist_set_data(module->exports,
+                                                    export);
+                                        }
+                                        else
+                                        {
+                                            argos_logf("Insufficient memory to "
+                                                    "save imported module "
+                                                    "information, quiting Argos."
+                                                    "\n");
+                                            exit(1);
+                                        }
                                     }
                                     else
                                     {
-                                        argos_logf("Insufficient memory to save imported module information, quiting Argos.\n");
-                                        exit(1);
+                                        if (!slist_add_after(
+                                                    slist_tail(module->exports),
+                                                    export))
+                                        {
+                                            argos_logf("Insufficient memory to "
+                                                    "save imported module "
+                                                    "information, quiting Argos."
+                                                    "\n");
+                                            exit(1);
+                                        }
                                     }
-
+                                    return export;
                                 }
                                 else
                                 {
-                                    free(export);
+                                    argos_logf("Insufficient memory to "
+                                            "save imported module "
+                                            "information, quiting Argos."
+                                            "\n");
+                                    exit(1);
                                 }
+
                             }
                             else
                             {
-                                free(export);
+                                argos_logf("Insufficient memory to "
+                                        "save imported module "
+                                        "information, quiting Argos.\n"
+                                        );
+                                exit(1);
                             }
                         }
-                        else
-                        {
-                            free(export);
-                        }
-                    }
-                    else
-                    {
-                        free(export);
                     }
                 }
-                else
-                {
-                    free(export);
-                }
-            }
-            else
-            {
-                argos_logf("Insufficient memory to save imported module information, quiting Argos.\n");
-                exit(1);
             }
         }
     }
