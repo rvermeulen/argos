@@ -125,7 +125,7 @@ DATA_TYPE REGPARM(1) glue(glue(__ld, SUFFIX), MMUSUFFIX)(target_ulong addr,
         physaddr = addr + env->tlb_table[mmu_idx][index].addend;
 #ifdef ARGOS_SOFTMMU
         env->shellcode_context.load_addr = physaddr;
-        env->shellcode_context.load_addr_type = ARGOS_HOST_VIRTUAL_ADDR;
+        env->shellcode_context.load_addr_type = HOST_VIRTUAL;
 #endif
         if (tlb_addr & ~TARGET_PAGE_MASK) {
             /* IO access */
@@ -167,6 +167,10 @@ DATA_TYPE REGPARM(1) glue(glue(__ld, SUFFIX), MMUSUFFIX)(target_ulong addr,
             res = glue(glue(ld, USUFFIX), _raw)((uint8_t *)(long)physaddr);
 #endif
         }
+#if defined(ARGOS_SOFTMMU) && (MEMSUFFIX == _data)
+        argos_tracksc_on_translate_ld_addr(env, addr, physaddr, res,
+                DATA_SIZE);
+#endif
     } else {
         /* the page is not in the TLB : fill it */
         retaddr = GETPC();
@@ -340,7 +344,7 @@ void REGPARM(2) glue(glue(__st, SUFFIX), MMUSUFFIX)(target_ulong addr,
         physaddr = addr + env->tlb_table[mmu_idx][index].addend;
 #ifdef ARGOS_SOFTMMU
         env->shellcode_context.store_addr = physaddr;
-        env->shellcode_context.store_addr_type = ARGOS_HOST_VIRTUAL_ADDR;
+        env->shellcode_context.store_addr_type = HOST_VIRTUAL;
 #endif
         if (tlb_addr & ~TARGET_PAGE_MASK) {
             /* IO access */
@@ -382,6 +386,10 @@ void REGPARM(2) glue(glue(__st, SUFFIX), MMUSUFFIX)(target_ulong addr,
 	    glue(ARGOS_MEMMAP_CLR, SUFFIX)((uint8_t *)(long)physaddr);
 #endif
         }
+#if defined(ARGOS_SOFTMMU) && (MEMSUFFIX == _data)
+        argos_tracksc_on_translate_st_addr(env, addr, physaddr, val,
+                DATA_SIZE);
+#endif
     } else {
         /* the page is not in the TLB : fill it */
         retaddr = GETPC();

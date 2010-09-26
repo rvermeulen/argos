@@ -284,6 +284,11 @@ static inline RES_TYPE glue(glue(ld, USUFFIX), MEMSUFFIX)(target_ulong ptr)
 #else
         res = glue(glue(ld, USUFFIX), _raw)((uint8_t *)physaddr);
 #endif
+
+#if defined(ARGOS_SOFTMMU) && (MEMSUFFIX == _data)
+        argos_tracksc_on_translate_ld_addr(env, addr, physaddr, res,
+                DATA_SIZE);
+#endif
     }
     return res;
 }
@@ -300,7 +305,7 @@ static inline int glue(glue(lds, SUFFIX), MEMSUFFIX)(target_ulong ptr)
     target_ulong addr;
     unsigned long physaddr;
     int mmu_idx;
-
+    
     addr = ptr;
     index = (addr >> TARGET_PAGE_BITS) & (CPU_TLB_SIZE - 1);
     mmu_idx = CPU_MMU_INDEX;
@@ -324,6 +329,11 @@ static inline int glue(glue(lds, SUFFIX), MEMSUFFIX)(target_ulong ptr)
 #endif // ACCESS_TYPE
 #else
         res = glue(glue(lds, SUFFIX), _raw)((uint8_t *)physaddr);
+#endif
+
+#if defined(ARGOS_SOFTMMU) && (MEMSUFFIX == _data)
+        argos_tracksc_on_translate_ld_addr(env, addr, physaddr, res,
+                DATA_SIZE);
 #endif
     }
     return res;
@@ -364,6 +374,10 @@ static inline void glue(glue(st, SUFFIX), MEMSUFFIX)(target_ulong ptr, RES_TYPE 
 #else
         glue(glue(st, SUFFIX), _raw)((uint8_t *)physaddr, v);
 	glue(ARGOS_MEMMAP_CLR, SUFFIX)((uint8_t *)physaddr);
+#endif
+#if defined(ARGOS_SOFTMMU) && (MEMSUFFIX == _data)
+        argos_tracksc_on_translate_st_addr(env, addr, physaddr, v,
+                DATA_SIZE);
 #endif
     }
 }
