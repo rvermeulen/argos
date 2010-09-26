@@ -39,9 +39,7 @@
 #define ARGOS_STOP_ON_INSTRUCTION_COUNT 0
 #define ARGOS_STOP_ON_FIRST_SYSTEM_CALL 1
 // Memory address types
-#define ARGOS_GUEST_VIRTUAL_ADDR    0
-#define ARGOS_GUEST_PHYSICAL_ADDR   1
-#define ARGOS_HOST_VIRTUAL_ADDR     2
+typedef enum {GUEST_VIRTUAL, GUEST_PHYSICAL, HOST_VIRTUAL} memory_address_type;
 
 // Instance status types
 #define ARGOS_TRACKSC_PHASE_IDLE       0x1
@@ -86,6 +84,15 @@ typedef struct _argos_tracksc_exported_function
     target_ulong ordinal;
     target_ulong address;
 } argos_tracksc_exported_function;
+
+typedef struct _argos_tracksc_memref_info
+{
+    target_ulong eip;
+    target_ulong vaddr;
+    target_ulong paddr;
+    target_ulong value;
+    target_ulong size;
+} argos_tracksc_memref_info;
 
 // The argos shellcode context contains the context that is needed to
 // to track the execution of shellcode and the bytes referenced by
@@ -132,14 +139,14 @@ typedef struct _argos_tracksc_context
     target_ulong load_value;
     // Address of the bytes loaded by the instruction
     unsigned long load_addr;
-    unsigned char load_addr_type;
+    memory_address_type load_addr_type;
     // Number of loaded bytes
     unsigned load_size;
     // Bytes stored by the instruction
     target_ulong store_value;
     // Address of the bytes loaded by the instruction
     unsigned long store_addr;
-    unsigned char store_addr_type;
+    memory_address_type store_addr_type;
     // Number of stored bytes
     unsigned store_size;
     slist_entry * imported_modules;
@@ -162,5 +169,9 @@ typedef struct _argos_tracksc_context
     // We use this in the log file.
     argos_tracksc_exported_function * called_function;
     unsigned char single_step;
+
+    // New memory reference trackers
+    argos_tracksc_memref_info load_info;
+    argos_tracksc_memref_info store_info;
 } argos_shellcode_context_t;
 #endif
