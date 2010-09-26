@@ -49,49 +49,49 @@
     do { \
         (var) = ldub_raw((addr)); \
         ARGOS_MEMMAP_LDb((addr), (tag)); \
-        ARGOS_SAVE_LDb_CONTEXT(addr, var, ARGOS_HOST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_LDb_CONTEXT(addr, var, HOST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_LDsb_raw(addr, var, tag) \
     do { \
         (var) = ldsb_raw((addr)); \
         ARGOS_MEMMAP_LDb((addr), (tag)); \
-        ARGOS_SAVE_LDb_CONTEXT(addr, var, ARGOS_HOST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_LDb_CONTEXT(addr, var, HOST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_LDuw_raw(addr, var, tag) \
     do { \
         (var) = lduw_raw((addr)); \
         ARGOS_MEMMAP_LDw((addr), (tag)); \
-        ARGOS_SAVE_LDw_CONTEXT(addr, var, ARGOS_HOST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_LDw_CONTEXT(addr, var, HOST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_LDsw_raw(addr, var, tag) \
     do { \
         (var) = ldsw_raw((addr)); \
         ARGOS_MEMMAP_LDw((addr), (tag)); \
-        ARGOS_SAVE_LDw_CONTEXT(addr, var, ARGOS_HOST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_LDw_CONTEXT(addr, var, HOST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_LDl_raw(addr, var, tag) \
     do { \
         (var) = (uint32_t)ldl_raw((addr)); \
         ARGOS_MEMMAP_LDl((addr), (tag)); \
-        ARGOS_SAVE_LDl_CONTEXT(addr, var, ARGOS_HOST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_LDl_CONTEXT(addr, var, HOST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_LDsl_raw(addr, var, tag) \
     do { \
         (var) = (int32_t)ldl_raw((addr)); \
         ARGOS_MEMMAP_LDl((addr), (tag)); \
-        ARGOS_SAVE_LDl_CONTEXT(addr, var, ARGOS_HOST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_LDl_CONTEXT(addr, var, HOST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_LDq_raw(addr, var, tag) \
     do {\
         (var) = ldq_raw((addr)); \
         ARGOS_MEMMAP_LDq((addr), (tag)); \
-        ARGOS_SAVE_LDq_CONTEXT(addr, var, ARGOS_HOST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_LDq_CONTEXT(addr, var, HOST_VIRTUAL); \
     } while (0)
 
 // Store raw macros
@@ -101,7 +101,7 @@
         argos_netidx_t* netidx = ARGOS_NETIDXPTR(addr); \
         stb_raw((addr), val); \
         ARGOS_MEMMAP_STb((addr), (tag));\
-        ARGOS_SAVE_STb_CONTEXT(addr, val, ARGOS_HOST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_STb_CONTEXT(addr, val, HOST_VIRTUAL); \
         if ( netidx && ARGOS_TRACKSC_IS_TRACKING ) \
         { \
             ARGOS_SET_STAGE( *netidx, env->shellcode_context.instruction_stage  ); \
@@ -114,7 +114,7 @@
         argos_netidx_t* netidx = ARGOS_NETIDXPTR(addr); \
         stw_raw((addr), val); \
         ARGOS_MEMMAP_STw((addr), (tag)); \
-        ARGOS_SAVE_STw_CONTEXT(addr, val, ARGOS_HOST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_STw_CONTEXT(addr, val, HOST_VIRTUAL); \
         if ( netidx && ARGOS_TRACKSC_IS_TRACKING ) \
         { \
             ARGOS_SET_STAGE( *netidx, env->shellcode_context.instruction_stage  ); \
@@ -127,7 +127,7 @@
         argos_netidx_t* netidx = ARGOS_NETIDXPTR(addr); \
         stl_raw((addr), val); \
         ARGOS_MEMMAP_STl((addr), (tag)); \
-        ARGOS_SAVE_STl_CONTEXT(addr, val, ARGOS_HOST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_STl_CONTEXT(addr, val, HOST_VIRTUAL); \
         if ( netidx && ARGOS_TRACKSC_IS_TRACKING ) \
         { \
             ARGOS_SET_STAGE( *netidx, env->shellcode_context.instruction_stage  ); \
@@ -140,7 +140,7 @@
         argos_netidx_t* netidx = ARGOS_NETIDXPTR(addr); \
         stq_raw((addr), val); \
         ARGOS_MEMMAP_STq((addr), (tag));\
-        ARGOS_SAVE_STq_CONTEXT(addr, val, ARGOS_HOST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_STq_CONTEXT(addr, val, HOST_VIRTUAL); \
         if ( netidx && ARGOS_TRACKSC_IS_TRACKING ) \
         { \
             ARGOS_SET_STAGE( *netidx, env->shellcode_context.instruction_stage  ); \
@@ -152,28 +152,28 @@
     do { \
         stb_raw((addr), val); \
         ARGOS_MEMMAP_STb((addr), (tag));\
-        ARGOS_SAVE_STb_CONTEXT(addr, val, ARGOS_HOST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_STb_CONTEXT(addr, val, HOST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_STw_raw(addr, val, tag) \
     do { \
         stw_raw((addr), val); \
         ARGOS_MEMMAP_STw((addr), (tag)); \
-        ARGOS_SAVE_STw_CONTEXT(addr, val, ARGOS_HOST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_STw_CONTEXT(addr, val, HOST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_STl_raw(addr, val, tag) \
     do { \
         stl_raw((addr), val); \
         ARGOS_MEMMAP_STl((addr), (tag)); \
-        ARGOS_SAVE_STl_CONTEXT(addr, val, ARGOS_HOST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_STl_CONTEXT(addr, val, HOST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_STq_raw(addr, val, tag) \
     do { \
         stq_raw((addr), val); \
         ARGOS_MEMMAP_STq((addr), (tag));\
-        ARGOS_SAVE_STq_CONTEXT(addr, val, ARGOS_HOST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_STq_CONTEXT(addr, val, HOST_VIRTUAL); \
     } while (0)
 #endif // ARGOS_NET_TRACKER
 
@@ -199,49 +199,49 @@
     do { \
         (var) = argos_ldub_user((addr), (tag)); \
         env->shellcode_context.load_value_netidx = ARGOS_NETIDXPTR(env->shellcode_context.load_addr); \
-        ARGOS_SAVE_LDb_CONTEXT(addr, var, ARGOS_GUEST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_LDb_CONTEXT(addr, var, GUEST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_LDsb_user(addr, var, tag) \
     do { \
         (var) = argos_ldsb_user((addr), (tag)); \
         env->shellcode_context.load_value_netidx = ARGOS_NETIDXPTR(env->shellcode_context.load_addr); \
-        ARGOS_SAVE_LDb_CONTEXT(addr, var, ARGOS_GUEST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_LDb_CONTEXT(addr, var, GUEST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_LDuw_user(addr, var, tag) \
     do { \
         (var) = argos_lduw_user((addr), (tag)); \
         env->shellcode_context.load_value_netidx = ARGOS_NETIDXPTR(env->shellcode_context.load_addr); \
-        ARGOS_SAVE_LDw_CONTEXT(addr, var, ARGOS_GUEST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_LDw_CONTEXT(addr, var, GUEST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_LDsw_user(addr, var, tag) \
     do { \
         (var) = argos_ldsw_user((addr), (tag)); \
         env->shellcode_context.load_value_netidx = ARGOS_NETIDXPTR(env->shellcode_context.load_addr); \
-        ARGOS_SAVE_LDw_CONTEXT(addr, var, ARGOS_GUEST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_LDw_CONTEXT(addr, var, GUEST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_LDl_user(addr, var, tag) \
     do { \
         (var) = (uint32_t)argos_ldl_user((addr), (tag)); \
         env->shellcode_context.load_value_netidx = ARGOS_NETIDXPTR(env->shellcode_context.load_addr); \
-        ARGOS_SAVE_LDl_CONTEXT(addr, var, ARGOS_GUEST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_LDl_CONTEXT(addr, var, GUEST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_LDsl_user(addr, var, tag) \
     do { \
         (var) = (int32_t)argos_ldl_user((addr), (tag)); \
         env->shellcode_context.load_value_netidx = ARGOS_NETIDXPTR(env->shellcode_context.load_addr); \
-        ARGOS_SAVE_LDl_CONTEXT(addr, var, ARGOS_GUEST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_LDl_CONTEXT(addr, var, GUEST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_LDq_user(addr, var, tag) \
     do { \
         (var) = argos_ldq_user((addr), (tag)); \
         env->shellcode_context.load_value_netidx = ARGOS_NETIDXPTR(env->shellcode_context.load_addr); \
-        ARGOS_SAVE_LDq_CONTEXT(addr, var, ARGOS_GUEST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_LDq_CONTEXT(addr, var, GUEST_VIRTUAL); \
     } while (0)
 
 // Store user macros
@@ -250,7 +250,7 @@
     do { \
         argos_stb_user((addr), (val), (tag)); \
         env->shellcode_context.store_value_netidx = ARGOS_NETIDXPTR(env->shellcode_context.store_addr); \
-        ARGOS_SAVE_STb_CONTEXT(addr, val, ARGOS_GUEST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_STb_CONTEXT(addr, val, GUEST_VIRTUAL); \
         if ( env->shellcode_context.store_value_netidx && ARGOS_TRACKSC_IS_TRACKING ) \
         { \
             ARGOS_SET_STAGE( *env->shellcode_context.store_value_netidx, env->shellcode_context.instruction_stage  ); \
@@ -262,7 +262,7 @@
     do { \
         argos_stw_user((addr), (val), (tag)); \
         env->shellcode_context.store_value_netidx = ARGOS_NETIDXPTR(env->shellcode_context.store_addr); \
-        ARGOS_SAVE_STw_CONTEXT(addr, val, ARGOS_GUEST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_STw_CONTEXT(addr, val, GUEST_VIRTUAL); \
         if ( env->shellcode_context.store_value_netidx && ARGOS_TRACKSC_IS_TRACKING ) \
         { \
             ARGOS_SET_STAGE( *env->shellcode_context.store_value_netidx, env->shellcode_context.instruction_stage  ); \
@@ -274,7 +274,7 @@
     do { \
         argos_stl_user((addr), (val), (tag)); \
         env->shellcode_context.store_value_netidx = ARGOS_NETIDXPTR(env->shellcode_context.store_addr); \
-        ARGOS_SAVE_STl_CONTEXT(addr, val, ARGOS_GUEST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_STl_CONTEXT(addr, val, GUEST_VIRTUAL); \
         if ( env->shellcode_context.store_value_netidx && ARGOS_TRACKSC_IS_TRACKING ) \
         { \
             ARGOS_SET_STAGE( *env->shellcode_context.store_value_netidx, env->shellcode_context.instruction_stage  ); \
@@ -286,7 +286,7 @@
     do { \
         argos_stq_user((addr), (val), (tag)); \
         env->shellcode_context.store_value_netidx = ARGOS_NETIDXPTR(env->shellcode_context.store_addr); \
-        ARGOS_SAVE_STq_CONTEXT(addr, val, ARGOS_GUEST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_STq_CONTEXT(addr, val, GUEST_VIRTUAL); \
         if ( env->shellcode_context.store_value_netidx && ARGOS_TRACKSC_IS_TRACKING ) \
         { \
             ARGOS_SET_STAGE( *env->shellcode_context.store_value_netidx, env->shellcode_context.instruction_stage  ); \
@@ -300,43 +300,43 @@
 #define ARGOS_LDub_user(addr, var, tag) \
     do { \
         (var) = argos_ldub_user((addr), (tag)); \
-        ARGOS_SAVE_LDb_CONTEXT(addr, var, ARGOS_GUEST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_LDb_CONTEXT(addr, var, GUEST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_LDsb_user(addr, var, tag) \
     do { \
         (var) = argos_ldsb_user((addr), (tag)); \
-        ARGOS_SAVE_LDb_CONTEXT(addr, var, ARGOS_GUEST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_LDb_CONTEXT(addr, var, GUEST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_LDuw_user(addr, var, tag) \
     do { \
         (var) = argos_lduw_user((addr), (tag)); \
-        ARGOS_SAVE_LDw_CONTEXT(addr, var, ARGOS_GUEST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_LDw_CONTEXT(addr, var, GUEST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_LDsw_user(addr, var, tag) \
     do { \
         (var) = argos_ldsw_user((addr), (tag)); \
-        ARGOS_SAVE_LDw_CONTEXT(addr, var, ARGOS_GUEST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_LDw_CONTEXT(addr, var, GUEST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_LDl_user(addr, var, tag) \
     do { \
         (var) = (uint32_t)argos_ldl_user((addr), (tag)); \
-        ARGOS_SAVE_LDl_CONTEXT(addr, var, ARGOS_GUEST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_LDl_CONTEXT(addr, var, GUEST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_LDsl_user(addr, var, tag) \
     do { \
         (var) = (int32_t)argos_ldl_user((addr), (tag)); \
-        ARGOS_SAVE_LDl_CONTEXT(addr, var, ARGOS_GUEST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_LDl_CONTEXT(addr, var, GUEST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_LDq_user(addr, var, tag) \
     do { \
         (var) = argos_ldq_user((addr), (tag)); \
-        ARGOS_SAVE_LDq_CONTEXT(addr, var, ARGOS_GUEST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_LDq_CONTEXT(addr, var, GUEST_VIRTUAL); \
     } while (0)
 
 // Store user macros
@@ -344,25 +344,25 @@
 #define ARGOS_STb_user(addr, val, tag) \
     do { \
         argos_stb_user((addr), (val), (tag)); \
-        ARGOS_SAVE_STb_CONTEXT(addr, val, ARGOS_GUEST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_STb_CONTEXT(addr, val, GUEST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_STw_user(addr, val, tag) \
     do { \
         argos_stw_user((addr), (val), (tag)); \
-        ARGOS_SAVE_STw_CONTEXT(addr, val, ARGOS_GUEST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_STw_CONTEXT(addr, val, GUEST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_STl_user(addr, val, tag) \
     do { \
         argos_stl_user((addr), (val), (tag)); \
-        ARGOS_SAVE_STl_CONTEXT(addr, val, ARGOS_GUEST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_STl_CONTEXT(addr, val, GUEST_VIRTUAL); \
     } while (0)
 
 #define ARGOS_STq_user(addr, val, tag) \
     do { \
         argos_stq_user((addr), (val), (tag)); \
-        ARGOS_SAVE_STq_CONTEXT(addr, val, ARGOS_GUEST_VIRTUAL_ADDR); \
+        ARGOS_SAVE_STq_CONTEXT(addr, val, GUEST_VIRTUAL); \
     } while (0)
 
 #endif // ARGOS_NET_TRACKER
