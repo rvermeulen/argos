@@ -101,23 +101,23 @@ typedef struct _argos_tracksc_context
 {
     // Is there an instance of shellcode running.
     unsigned phase;
-    unsigned stop_condition;
+    //unsigned stop_condition;
     // The value of the cr3 register at the moment code injection is
     // detected.
     // We use this to determine if the execution of tainted bytes belong
     // to the process of which we are tracking the execution of shellcode.
     target_ulong cr3;
     target_ulong thread_id;
-    FILE* logfile;
-    char * log_buffer;
-    target_ulong bytes_written_to_log_buffer;
+    //FILE* logfile;
+    //char * log_buffer;
+    //target_ulong bytes_written_to_log_buffer;
     // The number of shell-code instructions executed.
     unsigned instruction_cnt;
     // We use the current eip to check if memory references are
     // related/performed to the instruction we are now logging,
     // since we want to log those references.
-    target_ulong loadedby_eip;
-    target_ulong storedby_eip;
+    //target_ulong loadedby_eip;
+    //target_ulong storedby_eip;
     target_ulong executed_eip;
     INSTRUCTION instruction;
     unsigned char instruction_bytes[ARGOS_MAX_INSTRUCTION_SIZE];
@@ -136,19 +136,19 @@ typedef struct _argos_tracksc_context
     argos_netidx_t * store_value_netidx;
 #endif
     // Bytes loaded by the instruction
-    target_ulong load_value;
+    //target_ulong load_value;
     // Address of the bytes loaded by the instruction
-    unsigned long load_addr;
-    memory_address_type load_addr_type;
+    //unsigned long load_addr;
+    //memory_address_type load_addr_type;
     // Number of loaded bytes
-    unsigned load_size;
+    //unsigned load_size;
     // Bytes stored by the instruction
-    target_ulong store_value;
+    //target_ulong store_value;
     // Address of the bytes loaded by the instruction
-    unsigned long store_addr;
-    memory_address_type store_addr_type;
+    //unsigned long store_addr;
+    //memory_address_type store_addr_type;
     // Number of stored bytes
-    unsigned store_size;
+    //unsigned store_size;
     slist_entry * imported_modules;
     // Array of the different LoadLibrary functions that can be used to load libraries
     // at run-time. Often used by shell-code to get access to functionality.
@@ -156,7 +156,7 @@ typedef struct _argos_tracksc_context
     // 1: LoadLibraryW
     // 2: LoadLibraryExA
     // 3: LoadLibraryExW
-    argos_tracksc_exported_function * load_library_functions[ARGOS_NUM_OF_LOADLIBRARY_FUNCTIONS];
+    //argos_tracksc_exported_function * load_library_functions[ARGOS_NUM_OF_LOADLIBRARY_FUNCTIONS];
     // Containing the return value of a call ( the content of the eax register ), when requested.
     target_ulong saved_return_value;
     // Since mutiple returns can be nested in a function call we use the return address to 

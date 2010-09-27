@@ -87,7 +87,7 @@ void argos_alert(CPUX86State *env, target_ulong new_pc, argos_rtag_t *tag,
         // (e.g. we are executing tainted instructions).
         if ( argos_tracksc_is_idle(env) && code == ARGOS_ALERT_CI )
         {
-            argos_tracksc_enable(env);
+            argos_tracksc_start(env);
         }
     }
 #if 0

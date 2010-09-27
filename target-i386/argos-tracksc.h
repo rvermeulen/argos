@@ -33,15 +33,12 @@
 #define ARGOS_TRACKSC_H
 void argos_tracksc_init(CPUX86State * env);
 void argos_tracksc_stop(CPUX86State * env);
-void argos_tracksc_enable(CPUX86State * env);
+void argos_tracksc_start(CPUX86State * env);
 void argos_tracksc_before_instruction_execution(CPUX86State * env);
 void argos_tracksc_after_instruction_execution(CPUX86State * env);
 void argos_tracksc_after_instruction_raised_an_exception(CPUX86State * env);
-void argos_tracksc_log_instruction(CPUX86State * env);
-void argos_tracksc_check_function_call( CPUX86State * env);
 unsigned char argos_tracksc_is_idle( CPUX86State * env);
 unsigned char argos_tracksc_is_tracking( CPUX86State * env);
-void argos_tracksc_check_for_return(CPUX86State * env);
 
 void argos_tracksc_on_call(CPUX86State * env);
 void argos_tracksc_on_jmp(CPUX86State * env);
@@ -50,44 +47,6 @@ void argos_tracksc_on_translate_ld_addr(CPUX86State * env, target_ulong vaddr,
         target_phys_addr_t paddr, target_ulong value, target_ulong size);
 void argos_tracksc_on_translate_st_addr(CPUX86State * env, target_ulong vaddr,
         target_phys_addr_t paddr, target_ulong value, target_ulong size);
-
-//#define ARGOS_TRACKSC_IS_TRACKING env->shellcode_context.phase \
-//    == ARGOS_TRACKSC_PHASE_TRACKING
-
-// The following macro's are used to store the load and store context.
-#define ARGOS_SAVE_LD_CONTEXT(addr, var, type, size) /*\
-    do { \
-        if ( ARGOS_TRACKSC_IS_TRACKING ) \
-        { \
-            env->shellcode_context.loadedby_eip = env->eip; \
-            env->shellcode_context.load_value = (var); \
-            env->shellcode_context.load_size = (size); \
-            env->shellcode_context.load_addr = (unsigned long)(addr); \
-            env->shellcode_context.load_addr_type = (type); \
-        } \
-    } while(0)
-    */
-#define ARGOS_SAVE_LDb_CONTEXT(addr, var, type) //ARGOS_SAVE_LD_CONTEXT(addr, var, type, 1)
-#define ARGOS_SAVE_LDw_CONTEXT(addr, var, type) //ARGOS_SAVE_LD_CONTEXT(addr, var, type, 2)
-#define ARGOS_SAVE_LDl_CONTEXT(addr, var, type) //ARGOS_SAVE_LD_CONTEXT(addr, var, type, 4)
-#define ARGOS_SAVE_LDq_CONTEXT(addr, var, type) //ARGOS_SAVE_LD_CONTEXT(addr, var, type, 8)
-
-#define ARGOS_SAVE_ST_CONTEXT(addr, val, type, size) /*\
-    do { \
-        if ( ARGOS_TRACKSC_IS_TRACKING ) \
-        { \
-            env->shellcode_context.storedby_eip = env->eip; \
-            env->shellcode_context.store_value = (val); \
-            env->shellcode_context.store_size = (size); \
-            env->shellcode_context.store_addr = (unsigned long)(addr); \
-            env->shellcode_context.store_addr_type = (type); \
-        } \
-    } while(0)
-    */
-#define ARGOS_SAVE_STb_CONTEXT(addr, val, type) //ARGOS_SAVE_ST_CONTEXT(addr, val, type, 1)
-#define ARGOS_SAVE_STw_CONTEXT(addr, val, type) //ARGOS_SAVE_ST_CONTEXT(addr, val, type, 2)
-#define ARGOS_SAVE_STl_CONTEXT(addr, val, type) //ARGOS_SAVE_ST_CONTEXT(addr, val, type, 4)
-#define ARGOS_SAVE_STq_CONTEXT(addr, val, type) //ARGOS_SAVE_ST_CONTEXT(addr, val, type, 8)
 
 // X should be retrieved by the expression get_phys_addr_code(env, addr) +
 // (unsigned long)phys_ram_base
