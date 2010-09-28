@@ -100,7 +100,7 @@ void argos_tracksc_log_after_execution(argos_tracksc_log * log)
     argos_shellcode_context_t * ctx = &state->shellcode_context;
     argos_tracksc_log_entry * entry = NULL;
 log_entry:
-    entry = log->current_entry++;
+    entry = log->current_entry;
     if (entry < &log->buffered_entries[10])
     {
         // Copy instruction.
@@ -112,13 +112,13 @@ log_entry:
                 ctx->instruction.length);
         entry->instruction.stage = ctx->instruction_stage;
 #endif
-        /*if (ctx->called_function)
+        if (ctx->called_function)
         {
-            argos_logf("Logging symbol: %s\n", ctx->called_function->name);
+            //argos_logf("Logging symbol: %s\n", ctx->called_function->name);
             strncpy(entry->instruction.operand1_symbol,
                     ctx->called_function->name,
                     sizeof(entry->instruction.operand1_symbol) - 1);
-        }*/
+        }
 
         // Copy memory references.
         if (ctx->load_info.eip ==
@@ -162,10 +162,11 @@ log_entry:
             }
 #endif // ARGOS_NET_TRACKER
         }
-        //else if (ctx->load_info.eip != 0)
-        //{
-        //    argos_logf("Unexpected load that does not belong the current program counter.\n");
-        //}
+        else if (ctx->load_info.eip != 0)
+        {
+            argos_logf("Unexpected load, expected eip: 0x%x, got eip:0x%x, current eip: 0x%x.\n",
+                    ctx->executed_eip, ctx->load_info.eip, state->eip);
+        }
 
 
         if (ctx->store_info.eip ==
@@ -210,10 +211,12 @@ log_entry:
             }
 #endif // ARGOS_NET_TRACKER
         }
-        //else if (ctx->load_info.eip != 0)
-        //{
-        //    argos_logf("Unexpected store that does not belong the current program counter.\n");
-        //}
+        else if (ctx->store_info.eip != 0)
+        {
+            argos_logf("Unexpected store, expected eip: 0x%x, got eip:0x%x, current eip: 0x%x.\n",
+                    ctx->executed_eip, ctx->store_info.eip, state->eip);
+        }
+        log->current_entry++;
     }
     else
     {
