@@ -6897,7 +6897,7 @@ static inline int gen_intermediate_code_internal(CPUState *env,
 
         /* If we are tracking shell-code, we generate only on instruction. */
         //if ( argos_tracksc_is_tracking(env) )
-        if ( env->shellcode_context.single_step )
+        if ( env->tracksc_ctx.single_step )
         {
             gen_jmp_im(pc_ptr - dc->cs_base);
             gen_eob(dc);

@@ -34,9 +34,9 @@
 void argos_tracksc_init(CPUX86State * env);
 void argos_tracksc_stop(CPUX86State * env);
 void argos_tracksc_start(CPUX86State * env);
-void argos_tracksc_before_instruction_execution(CPUX86State * env);
-void argos_tracksc_after_instruction_execution(CPUX86State * env);
-void argos_tracksc_after_instruction_raised_an_exception(CPUX86State * env);
+void argos_tracksc_before_instr_exec(CPUX86State * env);
+void argos_tracksc_after_instr_exec(CPUX86State * env);
+void argos_tracksc_after_instr_raised_exception(CPUX86State * env);
 unsigned char argos_tracksc_is_idle( CPUX86State * env);
 unsigned char argos_tracksc_is_tracking( CPUX86State * env);
 

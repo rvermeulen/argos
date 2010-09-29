@@ -35,16 +35,12 @@
 #define ARGOS_MAX_INSTRUCTION_COUNT 100
 #define ARGOS_MAX_INSTRUCTION_SIZE 17
 
-// Shellcode stop conditions
-#define ARGOS_STOP_ON_INSTRUCTION_COUNT 0
-#define ARGOS_STOP_ON_FIRST_SYSTEM_CALL 1
-// Memory address types
-typedef enum {GUEST_VIRTUAL, GUEST_PHYSICAL, HOST_VIRTUAL} memory_address_type;
-
 // Instance status types
-#define ARGOS_TRACKSC_PHASE_IDLE       0x1
-#define ARGOS_TRACKSC_PHASE_ANALYZING  0x2
-#define ARGOS_TRACKSC_PHASE_TRACKING   0x3
+typedef enum {IDLE, ANALYZING, TRACKING} argos_tracksc_instance_state;
+
+typedef enum {SHELL_CODE, NON_SHELL_CODE, LOAD_LIBRARY_CODE} argos_tracksc_code_type;
+
+typedef enum {NONE_CALL, WHITELISTED_CALL, BLACKLISTED_CALL, UNKNOWN_CALL} argos_tracksc_call_type;
 
 // Documentated at http://msdn.microsoft.com/en-us/library/aa365247%28VS.85%29.aspx
 #define ARGOS_MAX_PATH 260
@@ -77,13 +73,13 @@ typedef struct _argos_tracksc_imported_module
     slist_entry * exports;
 } argos_tracksc_imported_module;
 
-typedef struct _argos_tracksc_exported_function
+typedef struct _argos_tracksc_imported_function
 {
     argos_tracksc_imported_module * module;
     const char * name;
     target_ulong ordinal;
     target_ulong address;
-} argos_tracksc_exported_function;
+} argos_tracksc_imported_function;
 
 typedef struct _argos_tracksc_memref_info
 {
@@ -92,86 +88,58 @@ typedef struct _argos_tracksc_memref_info
     target_ulong paddr;
     target_ulong value;
     target_ulong size;
+#ifdef ARGOS_NET_TRACKER
+    argos_netidx_t * netidx;
+#endif
 } argos_tracksc_memref_info;
 
+typedef struct _argos_tracksc_instr_ctx
+{
+    // Did we logged something.
+    unsigned char logged;
+    target_ulong eip;
+    INSTRUCTION decoding;
+    unsigned char bytes[ARGOS_MAX_INSTRUCTION_SIZE];
+    // We use this in the log file.
+    argos_tracksc_imported_function * called_function;
+    // This flag tells us if we called a black listed function.
+    argos_tracksc_call_type call_type;
+    // New memory reference trackers
+    argos_tracksc_memref_info load;
+    argos_tracksc_memref_info store;
+#ifdef ARGOS_NET_TRACKER
+    // The stage of the instruction being executed.
+    unsigned char stage;
+    // corresponding raw net id.
+    argos_netidx_t netidx[ARGOS_MAX_INSTRUCTION_SIZE];
+#endif
+} argos_tracksc_instr_ctx;
 // The argos shellcode context contains the context that is needed to
 // to track the execution of shellcode and the bytes referenced by
 // the shellcode instructions.
 typedef struct _argos_tracksc_context
 {
     // Is there an instance of shellcode running.
-    unsigned phase;
-    //unsigned stop_condition;
+    argos_tracksc_instance_state instance_state;
     // The value of the cr3 register at the moment code injection is
     // detected.
     // We use this to determine if the execution of tainted bytes belong
     // to the process of which we are tracking the execution of shellcode.
     target_ulong cr3;
     target_ulong thread_id;
-    //FILE* logfile;
-    //char * log_buffer;
-    //target_ulong bytes_written_to_log_buffer;
-    // The number of shell-code instructions executed.
-    unsigned instruction_cnt;
-    // We use the current eip to check if memory references are
-    // related/performed to the instruction we are now logging,
-    // since we want to log those references.
-    //target_ulong loadedby_eip;
-    //target_ulong storedby_eip;
-    target_ulong executed_eip;
-    INSTRUCTION instruction;
-    unsigned char instruction_bytes[ARGOS_MAX_INSTRUCTION_SIZE];
-    // Did we logged something.
-    unsigned logged;
+    // Per logged instruction context.
+    argos_tracksc_instr_ctx instr_ctx;
+    target_ulong prev_logged_eip;
+    //argos_tracksc_log * log;
 #ifdef ARGOS_NET_TRACKER
-    // The stage of the instruction being executed.
-    unsigned instruction_stage;
     // The highest stage in the current execution of shell-code.
-    unsigned trace_stage;
-    // corresponding raw net id.
-    argos_netidx_t instruction_netidx[ARGOS_MAX_INSTRUCTION_SIZE];
-    // Sometimes we retrieve the netidx before logging, so we cache it here
-    argos_netidx_t * load_value_netidx;
-    // Sometimes we retrieve the netidx before logging, so we cache it here
-    argos_netidx_t * store_value_netidx;
+    unsigned char trace_stage;
 #endif
-    // Bytes loaded by the instruction
-    //target_ulong load_value;
-    // Address of the bytes loaded by the instruction
-    //unsigned long load_addr;
-    //memory_address_type load_addr_type;
-    // Number of loaded bytes
-    //unsigned load_size;
-    // Bytes stored by the instruction
-    //target_ulong store_value;
-    // Address of the bytes loaded by the instruction
-    //unsigned long store_addr;
-    //memory_address_type store_addr_type;
-    // Number of stored bytes
-    //unsigned store_size;
     slist_entry * imported_modules;
-    // Array of the different LoadLibrary functions that can be used to load libraries
-    // at run-time. Often used by shell-code to get access to functionality.
-    // 0: LoadLibraryA
-    // 1: LoadLibraryW
-    // 2: LoadLibraryExA
-    // 3: LoadLibraryExW
-    //argos_tracksc_exported_function * load_library_functions[ARGOS_NUM_OF_LOADLIBRARY_FUNCTIONS];
-    // Containing the return value of a call ( the content of the eax register ), when requested.
-    target_ulong saved_return_value;
-    // Since mutiple returns can be nested in a function call we use the return address to 
+    // Since mutiple returns can be nested in a function call we use the return address to
     // check if a function call returns.
     target_ulong saved_return_address;
-    // This variable holds the number of calls made without a return.
-    // A call level, which is higher than 1, indicates nested calls.
-    target_ulong call_level;
-    // This pointer points to the function called if known, else equal to NULL.
-    // We use this in the log file.
-    argos_tracksc_exported_function * called_function;
+    argos_tracksc_code_type running_code;
     unsigned char single_step;
-
-    // New memory reference trackers
-    argos_tracksc_memref_info load_info;
-    argos_tracksc_memref_info store_info;
-} argos_shellcode_context_t;
+} argos_tracksc_ctx;
 #endif

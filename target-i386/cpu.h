@@ -486,7 +486,7 @@ typedef struct CPUX86State {
     argos_rtag_t t0tag, t1tag, t2tag;
     argos_rtag_t regtags[CPU_NB_REGS];
 
-    argos_shellcode_context_t shellcode_context;
+    argos_tracksc_ctx tracksc_ctx;
 
     /* emulator internal eflags handling */
     target_ulong cc_src;

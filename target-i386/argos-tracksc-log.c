@@ -7,6 +7,7 @@
 #include "argos-tracksc-context.h"
 #include "argos-tracksc.h"
 #include "argos-tracksc-log.h"
+#include "../argos-common.h"
 
 int write_header(argos_tracksc_log * log);
 
@@ -47,7 +48,10 @@ void argos_tracksc_close_log(argos_tracksc_log * log)
 void argos_tracksc_flush_log(argos_tracksc_log * log)
 {
     if (!log)
+    {
+        argos_logf("Failed to flush log, invalid log.\n");
         return;
+    }
 
     if ( log->current_entry > log->buffered_entries )
     {
@@ -58,9 +62,18 @@ void argos_tracksc_flush_log(argos_tracksc_log * log)
             fwrite(log->buffered_entries, sizeof(argos_tracksc_log_entry), cnt,
                 log->log_file);
 
-        if (nb_written != cnt)
+        if (nb_written == cnt)
+        {
+            if (fflush(log->log_file) == EOF)
+            {
+                argos_logf("Failed to flush log file.\n");
+            }
+        }
+        else
+        {
             argos_logf("Failed to write all shell-code tracked entries to the "
-                    "log file");
+                    "log file.\n");
+        }
 
         log->current_entry = log->buffered_entries;
 
@@ -71,7 +84,10 @@ void argos_tracksc_flush_log(argos_tracksc_log * log)
 void argos_tracksc_log_before_execution(argos_tracksc_log * log)
 {
     if (!log)
+    {
+        argos_logf("Failed to log before instruction, invalid log.\n");
         return;
+    }
 
     CPUX86State * state = log->state;
     argos_tracksc_log_entry * entry = NULL;
@@ -94,41 +110,43 @@ log_entry:
 void argos_tracksc_log_after_execution(argos_tracksc_log * log)
 {
     if (!log)
+    {
+        argos_logf("Failed to log after instruction, invalid log.\n");
         return;
+    }
 
     CPUX86State * state = log->state;
-    argos_shellcode_context_t * ctx = &state->shellcode_context;
+    argos_tracksc_ctx * ctx = &state->tracksc_ctx;
     argos_tracksc_log_entry * entry = NULL;
 log_entry:
     entry = log->current_entry;
     if (entry < &log->buffered_entries[10])
     {
         // Copy instruction.
-        memcpy(entry->instruction.bytes, ctx->instruction_bytes,
-                ctx->instruction.length);
-        entry->instruction.size = ctx->instruction.length;
+        memcpy(entry->instruction.bytes, ctx->instr_ctx.bytes,
+                ctx->instr_ctx.decoding.length);
+        entry->instruction.size = ctx->instr_ctx.decoding.length;
 #ifdef ARGOS_NET_TRACKER
-        memcpy(entry->instruction.netidx, ctx->instruction_netidx,
-                ctx->instruction.length);
-        entry->instruction.stage = ctx->instruction_stage;
+        memcpy(entry->instruction.netidx, ctx->instr_ctx.netidx,
+                ctx->instr_ctx.decoding.length);
+        entry->instruction.stage = ctx->instr_ctx.stage;
 #endif
-        if (ctx->called_function)
+        if (ctx->instr_ctx.called_function)
         {
             //argos_logf("Logging symbol: %s\n", ctx->called_function->name);
             strncpy(entry->instruction.operand1_symbol,
-                    ctx->called_function->name,
+                    ctx->instr_ctx.called_function->name,
                     sizeof(entry->instruction.operand1_symbol) - 1);
         }
 
         // Copy memory references.
-        if (ctx->load_info.eip ==
-                ctx->executed_eip)
+        if (ctx->instr_ctx.load.eip == ctx->instr_ctx.eip)
         {
             entry->memory_read.access_type = MEMORY_READ;
-            entry->memory_read.vaddr = ctx->load_info.vaddr;
-            entry->memory_read.paddr = ctx->load_info.paddr;
-            entry->memory_read.value = ctx->load_info.value;
-            entry->memory_read.size = ctx->load_info.size;
+            entry->memory_read.vaddr = ctx->instr_ctx.load.vaddr;
+            entry->memory_read.paddr = ctx->instr_ctx.load.paddr;
+            entry->memory_read.value = ctx->instr_ctx.load.value;
+            entry->memory_read.size = ctx->instr_ctx.load.size;
 
 #ifdef ARGOS_NET_TRACKER
             size_t i;
@@ -162,21 +180,21 @@ log_entry:
             }
 #endif // ARGOS_NET_TRACKER
         }
-        else if (ctx->load_info.eip != 0)
+        else if (ctx->instr_ctx.load.eip != 0)
         {
             argos_logf("Unexpected load, expected eip: 0x%x, got eip:0x%x, current eip: 0x%x.\n",
-                    ctx->executed_eip, ctx->load_info.eip, state->eip);
+                    ctx->instr_ctx.eip, ctx->instr_ctx.load.eip, state->eip);
         }
 
 
-        if (ctx->store_info.eip ==
-                ctx->executed_eip)
+        if (ctx->instr_ctx.store.eip ==
+                ctx->instr_ctx.eip)
         {
             entry->memory_written.access_type = MEMORY_WRITE;
-            entry->memory_written.vaddr = ctx->store_info.vaddr;
-            entry->memory_written.paddr = ctx->store_info.paddr;
-            entry->memory_written.value = ctx->store_info.value;
-            entry->memory_written.size = ctx->store_info.size;
+            entry->memory_written.vaddr = ctx->instr_ctx.store.vaddr;
+            entry->memory_written.paddr = ctx->instr_ctx.store.paddr;
+            entry->memory_written.value = ctx->instr_ctx.store.value;
+            entry->memory_written.size = ctx->instr_ctx.store.size;
 
 #ifdef ARGOS_NET_TRACKER
             size_t i;
@@ -211,10 +229,10 @@ log_entry:
             }
 #endif // ARGOS_NET_TRACKER
         }
-        else if (ctx->store_info.eip != 0)
+        else if (ctx->instr_ctx.store.eip != 0)
         {
             argos_logf("Unexpected store, expected eip: 0x%x, got eip:0x%x, current eip: 0x%x.\n",
-                    ctx->executed_eip, ctx->store_info.eip, state->eip);
+                    ctx->instr_ctx.eip, ctx->instr_ctx.store.eip, state->eip);
         }
         log->current_entry++;
     }

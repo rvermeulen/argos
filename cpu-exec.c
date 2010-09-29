@@ -702,14 +702,15 @@ int cpu_exec(CPUState *env1)
 #else
                 if (argos_tracksc_is_tracking(env))
                 {
-                    argos_tracksc_before_instruction_execution(env);
+                    argos_tracksc_before_instr_exec(env);
                 }
 
+                // Execute the generated instructions.
                 gen_func();
 
                 if (argos_tracksc_is_tracking(env))
                 {
-                    argos_tracksc_after_instruction_execution(env);
+                    argos_tracksc_after_instr_exec(env);
                 }
 
 #endif
@@ -739,11 +740,10 @@ int cpu_exec(CPUState *env1)
 
             /* Take care of the int 2E or sysenter system call before it is
              * executing the target code. */
-            argos_tracksc_after_instruction_raised_an_exception(env);
-            /*if ( argos_tracksc_logged_invalid_system_call(env) )
+            if (argos_tracksc_is_tracking(env))
             {
-                break;
-            }*/
+                argos_tracksc_after_instr_raised_exception(env);
+            }
         }
     } /* for(;;) */
 
