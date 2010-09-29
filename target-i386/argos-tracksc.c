@@ -177,8 +177,6 @@ void argos_tracksc_after_instr_exec(CPUX86State * env)
 
 void argos_tracksc_after_instr_raised_exception(CPUX86State * env)
 {
-    argos_logf("Instruction at 0x%x caused an exception.\n",
-            env->eip);
 }
 
 void check_call( CPUX86State * env)

@@ -55,8 +55,7 @@ void argos_tracksc_flush_log(argos_tracksc_log * log)
 
     if ( log->current_entry > log->buffered_entries )
     {
-        size_t cnt = log->current_entry -
-            log->buffered_entries - 1;
+        size_t cnt = log->current_entry - &log->buffered_entries[0];
 
         size_t nb_written =
             fwrite(log->buffered_entries, sizeof(argos_tracksc_log_entry), cnt,
@@ -75,7 +74,7 @@ void argos_tracksc_flush_log(argos_tracksc_log * log)
                     "log file.\n");
         }
 
-        log->current_entry = log->buffered_entries;
+        log->current_entry = &log->buffered_entries[0];
 
         memset(log->buffered_entries, 0, sizeof(log->buffered_entries));
     }
@@ -234,13 +233,13 @@ log_entry:
             argos_logf("Unexpected store, expected eip: 0x%x, got eip:0x%x, current eip: 0x%x.\n",
                     ctx->instr_ctx.eip, ctx->instr_ctx.store.eip, state->eip);
         }
-        log->current_entry++;
     }
     else
     {
         argos_tracksc_flush_log(log);
         goto log_entry;
     }
+    log->current_entry++;
 }
 
 int write_header(argos_tracksc_log * log)
