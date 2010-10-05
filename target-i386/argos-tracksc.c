@@ -167,7 +167,10 @@ void argos_tracksc_after_instr_exec(CPUX86State * env)
                 env->tracksc_ctx.instr_ctx.call_type == UNKNOWN_CALL)
         {
             argos_tracksc_stop(env);
-            exit(1);
+            // We return the instance id to notify parent processes that we
+            // succeded in tracking the shell-code so they can consult the
+            // corresponding logs.
+            exit(argos_instance_id);
         }
     }
 
@@ -328,14 +331,14 @@ static void address_translation_failure(CPUX86State * env, target_ulong address)
 {
     argos_logf("Argos failed to translate the address 0x%08x!!!\n", address);
     argos_tracksc_stop(env);
-    exit(1);
+    exit(EXIT_FAILURE);
 }
 
 static void memory_allocation_failure(CPUX86State * env, unsigned line)
 {
     argos_logf("Memory allocation failure at %s:%i.\n", __FILE__, line);
     argos_tracksc_stop(env);
-    exit(1);
+    exit(EXIT_FAILURE);
 }
 
 
