@@ -8468,6 +8468,7 @@ static void help(int exitcode)
 
            "Argos specific:\n"
 #ifdef TARGET_I386
+           "-argos-id       specify a integer used to identify the generated logs.\n"
            "-linux          use it when emulating Linux\n"
 	   "                 (optional if argos logs are disabled)\n"
            "-win2k          use it when emulating Windows 2000\n"
@@ -8637,6 +8638,7 @@ enum {
     QEMU_OPTION_cs_lport,
     QEMU_OPTION_tracksc,
     QEMU_OPTION_tracksc_whitelist,
+    QEMU_OPTION_argos_id,
 };
 
 typedef struct QEMUOption {
@@ -8757,6 +8759,7 @@ const QEMUOption qemu_options[] = {
     { "csport", HAS_ARG, QEMU_OPTION_cs_lport },
     { "tracksc", 0, QEMU_OPTION_tracksc },
     { "tracksc-whitelist", HAS_ARG, QEMU_OPTION_tracksc_whitelist },
+    { "argos-id", HAS_ARG, QEMU_OPTION_argos_id },
 
     { NULL },
 };
@@ -9688,6 +9691,16 @@ int main(int argc, char **argv)
                     fprintf(stderr, "Shell-code tracking is not enabled before defining the tracksc whitelist, ignoring tracksc-whitelist\n");
                 }
                 break;
+            case QEMU_OPTION_argos_id:
+                {
+                    argos_instance_id = strtol(optarg, NULL, 10);
+                    if ( errno == ERANGE )
+                    {
+                        fprintf(stderr, "Unable to store specified instance id, will generate a random one.\n");
+                        argos_instance_id = 0;
+                    }
+                }
+                break;
             }
         }
     }
@@ -9869,6 +9882,19 @@ int main(int argc, char **argv)
     init_argos_whitelist();
     read_argos_whitelist(argos_wprofile, DEFAULT_WHITELIST_FILE);
 #endif
+    // Very odd hack to compare the instance_id to 0, a direct compare will for
+    // some strange reason result in a sigfault.
+    // It has something to do with the register allocation in
+    // hostregs_helper.h, but I have to finish my thesis so this will do.
+    // if ( argos_instance_id == 0 )
+    char instance_id[1024];
+    snprintf(instance_id, sizeof(instance_id), "%i", argos_instance_id);
+    if ( !strcmp(instance_id, "0") )
+    {
+        srand(time(NULL));
+        argos_instance_id = random();
+        argos_logf("Generated %i instance id.\n", argos_instance_id);
+    }
 
     if ( argos_tracksc_whitelist_path )
     {
@@ -9885,8 +9911,8 @@ int main(int argc, char **argv)
             exit(1);
         }
     }
-    srand(time(NULL));
-    argos_instance_id = random();
+
+
     if (!(argos_memmap = argos_memmap_createz(phys_ram_size))) {
         fprintf(stderr, "Could not allocate argos memory map\n");
         exit(1);

@@ -73,21 +73,11 @@ static inline target_phys_addr_t translate_address(CPUX86State *env,
 
 void argos_tracksc_init(CPUX86State * env)
 {
-    const unsigned filename_size = 128;
-    char filename[filename_size];
     // Initialize the structure that holds the context of the shell-code
     // being tracked.
     memset(&env->tracksc_ctx, 0, sizeof(env->tracksc_ctx));
 
     env->tracksc_ctx.instance_state = IDLE;
-
-    snprintf(filename, filename_size, ARGOS_TRACKSC_LOG_FILENAME_TEMPLATE,
-            argos_instance_id);
-    binary_log = argos_tracksc_create_log(filename, env);
-    if (!binary_log)
-    {
-        argos_logf("Failed to create binary log!\n");
-    }
 }
 
 void argos_tracksc_stop(CPUX86State * env)
@@ -121,6 +111,18 @@ void argos_tracksc_start(CPUX86State * env)
 {
     argos_logf("Starting shell-code tracking...\n");
 
+    const unsigned filename_size = 128;
+    char filename[filename_size];
+
+    snprintf(filename, filename_size, ARGOS_TRACKSC_LOG_FILENAME_TEMPLATE,
+            argos_instance_id);
+    binary_log = argos_tracksc_create_log(filename, env);
+    if (!binary_log)
+    {
+        argos_logf("Failed to create binary log!\n");
+        exit(EXIT_FAILURE);
+    }
+
     // Save context of the shellcode.
     save_shellcode_context(env);
 
@@ -133,15 +135,21 @@ void argos_tracksc_start(CPUX86State * env)
 
 void argos_tracksc_before_instr_exec(CPUX86State * env)
 {
-    /*if ( env->tracksc_ctx.instr_ctx.eip != env->eip
-            && in_shellcode_context(env) )*/
+    // Are we in the attacked process and thread containing the payload?
     if ( in_shellcode_context(env) )
     {
-        if (argos_dest_pc_isdirty(env, env->eip))
+        if ( env->tracksc_ctx.running_code == BEFORE_SHELL_CODE
+                && argos_dest_pc_isdirty(env, env->eip))
         {
-            // Don't bother to log the already logged.
+            env->tracksc_ctx.running_code = SHELL_CODE;
+        }
+
+        if (env->tracksc_ctx.running_code == SHELL_CODE)
+        {
+            // For some reason some instructions are executed more than ones.
             if ( env->tracksc_ctx.prev_logged_eip != env->eip )
             {
+
                 env->tracksc_ctx.instr_ctx.eip = env->eip;
                 env->tracksc_ctx.instr_ctx.logged = 1;
 
@@ -163,7 +171,10 @@ void argos_tracksc_after_instr_exec(CPUX86State * env)
     {
         argos_tracksc_log_after_execution(binary_log);
         env->tracksc_ctx.prev_logged_eip = env->tracksc_ctx.instr_ctx.eip;
+    }
 
+    if (env->tracksc_ctx.running_code == SHELL_CODE)
+    {
         if (env->tracksc_ctx.instr_ctx.call_type == BLACKLISTED_CALL ||
                 env->tracksc_ctx.instr_ctx.call_type == UNKNOWN_CALL)
         {
@@ -171,12 +182,13 @@ void argos_tracksc_after_instr_exec(CPUX86State * env)
             // We return the instance id to notify parent processes that we
             // succeded in tracking the shell-code so they can consult the
             // corresponding logs.
-            exit(argos_instance_id);
+            exit(EXIT_SUCCESS);
         }
     }
 
     // Reset the instruction context.
-    memset(&env->tracksc_ctx.instr_ctx, 0, sizeof(env->tracksc_ctx.instr_ctx));
+    memset(&env->tracksc_ctx.instr_ctx, 0,
+            sizeof(env->tracksc_ctx.instr_ctx));
 }
 
 void argos_tracksc_after_instr_raised_exception(CPUX86State * env)
@@ -208,7 +220,6 @@ void check_call( CPUX86State * env)
                     // Did the shell-code made the call.
                     if ( ctx->running_code == SHELL_CODE )
                     {
-                        ctx->running_code = NON_SHELL_CODE;
                         save_return_address(env);
 
                         // Find the module coressponding to the current program
@@ -222,18 +233,20 @@ void check_call( CPUX86State * env)
                                         module->name,
                                         argos_tracksc_loaded_whitelist);
 
+                            // We search for the function here, because we want
+                            // the symbol for the call to a function belonging
+                            // to a blacklisted module.
+                            argos_tracksc_imported_function * function =
+                                find_imported_function(env, module,
+                                        env->eip);
+                            // Store the pointer to the called function
+                            ctx->instr_ctx.called_function =
+                                function;
+
                             if ( whitelist_entry )
                             {
-                                argos_tracksc_imported_function * function =
-                                    find_imported_function(env, module,
-                                            env->eip);
-
                                 if ( function )
                                 {
-                                    // Store the pointer to the called function
-                                    ctx->instr_ctx.called_function =
-                                        function;
-
                                     if ( function->name )
                                     {
                                         if ( argos_tracksc_whitelist_function_in_whitelist_entry(
@@ -253,6 +266,8 @@ void check_call( CPUX86State * env)
                                                 argos_logf("Shell-code "
                                                         "called %s\n",
                                                         function->name);
+                                                ctx->running_code =
+                                                    NON_SHELL_CODE;
                                                 ctx->instr_ctx.call_type =
                                                     WHITELISTED_CALL;
                                             }
@@ -386,6 +401,8 @@ static void instr_at_pc(CPUX86State * env)
 
 static void instr_at_addr(CPUX86State * env, target_phys_addr_t address)
 {
+    // libdasm should be replaced with a faster function to calculate the
+    // length of the instruction, because this is all we need.
     int instruction_length = get_instruction(
             &env->tracksc_ctx.instr_ctx.decoding, (BYTE *)address, MODE_32);
     memset(env->tracksc_ctx.instr_ctx.bytes, 0, ARGOS_MAX_INSTRUCTION_SIZE);
@@ -908,6 +925,8 @@ static void start_tracking_phase(CPUX86State * env)
     env->tracksc_ctx.instance_state = TRACKING;
     env->tracksc_ctx.single_step = 1;
     tb_flush(env);
+
+    env->tracksc_ctx.running_code = BEFORE_SHELL_CODE;
 
     argos_logf("Successfully instanciated shellcode tracking\n");
 }
