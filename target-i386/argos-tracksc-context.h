@@ -38,7 +38,7 @@
 // Instance status types
 typedef enum {IDLE, ANALYZING, TRACKING} argos_tracksc_instance_state;
 
-typedef enum {BEFORE_SHELL_CODE, SHELL_CODE, NON_SHELL_CODE, LOAD_LIBRARY_CODE} argos_tracksc_code_type;
+typedef enum {BEFORE_SHELL_CODE, SHELL_CODE, NON_SHELL_CODE, LOAD_LIBRARY_CODE } argos_tracksc_code_type;
 
 typedef enum {NONE_CALL, WHITELISTED_CALL, BLACKLISTED_CALL, UNKNOWN_CALL} argos_tracksc_call_type;
 

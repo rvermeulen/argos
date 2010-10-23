@@ -25,6 +25,7 @@ static void instr_at_addr(CPUX86State * env,
 static void address_translation_failure(CPUX86State * env,
         target_ulong address);
 static void memory_allocation_failure(CPUX86State * env, unsigned line);
+static void unexpected_state_failure(CPUX86State * env, unsigned line);
 static void get_imported_modules(CPUX86State * env);
 static target_ulong get_current_thread_id(CPUX86State * env);
 static unsigned char in_shellcode_context(CPUX86State * env);
@@ -146,19 +147,23 @@ void argos_tracksc_before_instr_exec(CPUX86State * env)
 
         if (env->tracksc_ctx.running_code == SHELL_CODE)
         {
-            // For some reason some instructions are executed more than ones.
-            if ( env->tracksc_ctx.prev_logged_eip != env->eip )
+            // Filter kernel-code ran in the shell-code context.
+            if ( env->eip < 0x80000000 )
             {
-                env->tracksc_ctx.instr_ctx.eip = env->eip;
-                env->tracksc_ctx.instr_ctx.logged = 1;
+                // For some reason some instructions are executed more than ones.
+                if ( env->tracksc_ctx.prev_logged_eip != env->eip )
+                {
+                    env->tracksc_ctx.instr_ctx.eip = env->eip;
+                    env->tracksc_ctx.instr_ctx.logged = 1;
 
-                instr_at_pc(env);
-                argos_tracksc_log_before_execution(binary_log);
-            }
-            else
-            {
-                argos_logf("Skipping already logged instruction at 0x%x\n",
-                        env->eip);
+                    instr_at_pc(env);
+                    argos_tracksc_log_before_execution(binary_log);
+                }
+                /*else
+                {
+                    argos_logf("Skipping already logged instruction at 0x%x\n",
+                            env->eip);
+                }*/
             }
         }
     }
@@ -202,7 +207,6 @@ void argos_tracksc_after_instr_raised_exception(CPUX86State * env)
 
 void check_call( CPUX86State * env)
 {
-
     argos_tracksc_ctx * ctx = &env->tracksc_ctx;
     sigset_t alrmset;
 
@@ -212,117 +216,97 @@ void check_call( CPUX86State * env)
     // We are only interested in calls made by the shell-code.
     if ( argos_tracksc_is_tracking(env) && in_shellcode_context(env) )
     {
-        // Are we calling code outside the payload?
-        if ( !argos_dest_pc_isdirty(env, env->eip))
+        if ( ctx->running_code == SHELL_CODE )
         {
-            // We are only interested in user-mode functions calls.
-            // NOTE: This comparison might be incorrect when different
-            // addressing modes like PAE are enabled.
-            if ( env->eip < 0x80000000 )
+            // Are we calling code outside the payload?
+            if ( !argos_dest_pc_isdirty(env, env->eip))
             {
                 if (argos_tracksc_loaded_whitelist)
                 {
-                    // Did the shell-code made the call.
-                    if ( ctx->running_code == SHELL_CODE )
+                    save_return_address(env);
+
+                    // Find the module coressponding to the current program
+                    // counter.
+                    argos_tracksc_imported_module * module =
+                        find_module(env, env->eip);
+                    if ( module )
                     {
-                        save_return_address(env);
+                        argos_tracksc_whitelist_entry * whitelist_entry =
+                            argos_tracksc_find_module_in_whitelist(
+                                    module->name,
+                                    argos_tracksc_loaded_whitelist);
 
-                        // Find the module coressponding to the current program
-                        // counter.
-                        argos_tracksc_imported_module * module =
-                            find_module(env, env->eip);
-                        if ( module )
+                        // We search for the function here, because we want
+                        // the symbol for the call to a function belonging
+                        // to a blacklisted module.
+                        argos_tracksc_imported_function * function =
+                            find_imported_function(env, module,
+                                    env->eip);
+                        // Store the pointer to the called function
+                        ctx->instr_ctx.called_function =
+                            function;
+
+                        if ( whitelist_entry )
                         {
-                            argos_tracksc_whitelist_entry * whitelist_entry =
-                                argos_tracksc_find_module_in_whitelist(
-                                        module->name,
-                                        argos_tracksc_loaded_whitelist);
-
-                            // We search for the function here, because we want
-                            // the symbol for the call to a function belonging
-                            // to a blacklisted module.
-                            argos_tracksc_imported_function * function =
-                                find_imported_function(env, module,
-                                        env->eip);
-                            // Store the pointer to the called function
-                            ctx->instr_ctx.called_function =
-                                function;
-
-                            if ( whitelist_entry )
+                            if ( function )
                             {
-                                if ( function )
+                                if ( function->name )
                                 {
-                                    if ( function->name )
+                                    if ( argos_tracksc_whitelist_function_in_whitelist_entry(
+                                                function->name, whitelist_entry) )
                                     {
-                                        if ( argos_tracksc_whitelist_function_in_whitelist_entry(
-                                                    function->name,
-                                                    whitelist_entry) )
+                                        if (is_loadlibrary_function(
+                                                    function->name))
                                         {
-                                            if (is_loadlibrary_function(
-                                                        function->name))
-                                            {
-                                                ctx->running_code =
-                                                    LOAD_LIBRARY_CODE;
-                                                ctx->instr_ctx.call_type =
-                                                    WHITELISTED_CALL;
-                                            }
-                                            else
-                                            {
-                                                argos_logf("Shell-code "
-                                                        "called %s\n",
-                                                        function->name);
-                                                ctx->running_code =
-                                                    NON_SHELL_CODE;
-                                                ctx->instr_ctx.call_type =
-                                                    WHITELISTED_CALL;
-                                            }
-
+                                            ctx->running_code =
+                                                LOAD_LIBRARY_CODE;
                                         }
                                         else
                                         {
-                                            argos_logf("Called blacklisted "
-                                                    "function %s!%s\n",
-                                                    module->name,
+                                            argos_logf("Shell-code "
+                                                    "called %s\n",
                                                     function->name);
-                                            ctx->instr_ctx.call_type =
-                                                BLACKLISTED_CALL;
+                                            ctx->running_code =
+                                                NON_SHELL_CODE;
                                         }
+                                    }
+                                    else
+                                    {
+                                        argos_logf("Called blacklisted "
+                                                "function %s!%s\n",
+                                                module->name,
+                                                function->name);
+                                        ctx->instr_ctx.call_type =
+                                            BLACKLISTED_CALL;
                                     }
                                 }
                                 else
                                 {
-                                    argos_logf("Shell-code is calling unknown "
-                                            "function in module %s.\n",
-                                            module->name);
-                                    ctx->instr_ctx.call_type =
-                                        UNKNOWN_CALL;
+                                    unexpected_state_failure(env, __LINE__);
                                 }
-
                             }
                             else
                             {
-                                argos_logf("Shell-code is calling black-listed"
-                                        " module %s, stopping Argos...\n",
+                                argos_logf("Shell-code is calling unknown "
+                                        "function in module %s.\n",
                                         module->name);
-                                ctx->instr_ctx.call_type = BLACKLISTED_CALL;
+                                ctx->instr_ctx.call_type =
+                                    UNKNOWN_CALL;
                             }
                         }
                         else
                         {
-                            argos_logf("Shell-code is calling function in an "
-                                    "unknown module.\n");
-                            ctx->instr_ctx.call_type = UNKNOWN_CALL;
+                            argos_logf("Shell-code is calling black-listed"
+                                    " module %s, stopping Argos...\n",
+                                    module->name);
+                            ctx->instr_ctx.call_type = BLACKLISTED_CALL;
                         }
-                    }
-                    else if (ctx->running_code == BEFORE_SHELL_CODE)
-                    {
-                        argos_logf("Encountered unexpected function call "
-                                "before we detected any shell-code.\n");
-                            ctx->instr_ctx.call_type = UNKNOWN_CALL;
                     }
                     else
                     {
-                        ctx->instr_ctx.call_type = WHITELISTED_CALL;
+                        argos_logf("Shell-code is calling function in an "
+                                "unknown module.\n");
+                        ctx->instr_ctx.call_type = UNKNOWN_CALL;
                     }
                 }
                 else
@@ -334,13 +318,19 @@ void check_call( CPUX86State * env)
             }
             else
             {
+                // Shell-code is calling itself.
                 ctx->instr_ctx.call_type = WHITELISTED_CALL;
             }
         }
-        else
+        else if (ctx->running_code == BEFORE_SHELL_CODE)
         {
-            // Shell-code is calling itself.
-            ctx->instr_ctx.call_type = WHITELISTED_CALL;
+            // If the target is not the shell-code.
+            if (!argos_dest_pc_isdirty(env, env->eip))
+            {
+                argos_logf("Encountered unexpected function call "
+                    "before we detected any shell-code.\n");
+                ctx->instr_ctx.call_type = UNKNOWN_CALL;
+            }
         }
     }
 
@@ -1152,66 +1142,72 @@ void check_ret(CPUX86State * env)
         perror("could not temporarily block signals");
 
     // Are we returning back from a non-shell-code function.
-    if ( argos_tracksc_is_tracking(env) && in_shellcode_context(env)
-            && ( env->tracksc_ctx.running_code == NON_SHELL_CODE
-                || env->tracksc_ctx.running_code == LOAD_LIBRARY_CODE))
+    if ( argos_tracksc_is_tracking(env) && in_shellcode_context(env) )
     {
-        // Are we returning back to the shell-code.
-        if ( env->tracksc_ctx.saved_return_address != 0
-                && env->tracksc_ctx.saved_return_address == env->eip )
+        if ( env->tracksc_ctx.running_code == NON_SHELL_CODE
+                || env->tracksc_ctx.running_code == LOAD_LIBRARY_CODE)
         {
-            // Are we returning from a loadlibray function?
-            if (env->tracksc_ctx.running_code == LOAD_LIBRARY_CODE)
+            // Are we returning back to the shell-code.
+            if ( env->tracksc_ctx.saved_return_address != 0
+                    && env->tracksc_ctx.saved_return_address == env->eip )
             {
-                target_ulong module_addr = env->regs[R_EAX];
-
-                // Did the load library function succeeded?
-                if ( module_addr != 0 )
+                // Are we returning from a loadlibray function?
+                if (env->tracksc_ctx.running_code == LOAD_LIBRARY_CODE)
                 {
-                    argos_tracksc_imported_module * loaded_module =
-                        get_module(env, module_addr);
-                    if ( loaded_module )
+                    target_ulong module_addr = env->regs[R_EAX];
+
+                    // Did the load library function succeeded?
+                    if ( module_addr != 0 )
                     {
-                        argos_logf("Loaded %s\n", loaded_module->name);
-                        if (env->tracksc_ctx.imported_modules)
+                        argos_tracksc_imported_module * loaded_module =
+                            get_module(env, module_addr);
+                        if ( loaded_module )
                         {
-                            slist_entry * tail = slist_add_after(
-                                    env->tracksc_ctx.imported_modules,
-                                    loaded_module);
-                            if (!tail)
+                            argos_logf("Loaded %s\n", loaded_module->name);
+                            if (env->tracksc_ctx.imported_modules)
                             {
-                                memory_allocation_failure(env, __LINE__);
+                                slist_entry * tail = slist_add_after(
+                                        env->tracksc_ctx.imported_modules,
+                                        loaded_module);
+                                if (!tail)
+                                {
+                                    memory_allocation_failure(env, __LINE__);
+                                }
+                            }
+                            else
+                            {
+                                slist_entry * head = slist_create();
+                                if ( head )
+                                {
+                                    slist_set_data(head, loaded_module);
+                                    env->tracksc_ctx.imported_modules = head;
+                                }
+                                else
+                                {
+                                    memory_allocation_failure(env, __LINE__);
+                                }
                             }
                         }
                         else
                         {
-                            slist_entry * head = slist_create();
-                            if ( head )
-                            {
-                                slist_set_data(head, loaded_module);
-                                env->tracksc_ctx.imported_modules = head;
-                            }
-                            else
-                            {
-                                memory_allocation_failure(env, __LINE__);
-                            }
+                            argos_logf("Loaded module is not a valid library!\n");
                         }
                     }
                     else
                     {
-                        argos_logf("Loaded module is not a valid library!\n");
+                        argos_logf("LoadLibrary call failed, skipping module "
+                                "analysis.\n");
                     }
                 }
-                else
-                {
-                    argos_logf("LoadLibrary call failed, skipping module "
-                            "analysis.\n");
-                }
-            }
 
-            // We back at running shell-code.
-            env->tracksc_ctx.running_code = SHELL_CODE;
+                // We back at running shell-code.
+                env->tracksc_ctx.running_code = SHELL_CODE;
+            }
         }
+        /*else if (env->tracksc_ctx.running_code == SHELL_CODE)
+        {
+            argos_logf("Shellcode returns to 0x%x\n", env->eip);
+        }*/
     }
 
     if (sigprocmask(SIG_UNBLOCK, &alrmset, NULL) != 0)
@@ -1305,4 +1301,11 @@ void argos_tracksc_on_int2e(CPUX86State * env)
     {
         argos_tracksc_on_system_call(env);
     }
+}
+
+static void unexpected_state_failure(CPUX86State * env, unsigned line)
+{
+    argos_logf("Argos is in an unexpected state at %s:%i.\n", __FILE__, line);
+    argos_tracksc_stop(env);
+    exit(EXIT_FAILURE);
 }

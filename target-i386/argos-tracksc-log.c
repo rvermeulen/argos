@@ -179,11 +179,11 @@ log_entry:
             }
 #endif // ARGOS_NET_TRACKER
         }
-        else if (ctx->instr_ctx.load.eip != 0)
+        /*else if (ctx->instr_ctx.load.eip != 0)
         {
             argos_logf("Unexpected load, expected eip: 0x%x, got eip:0x%x, current eip: 0x%x.\n",
                     ctx->instr_ctx.eip, ctx->instr_ctx.load.eip, state->eip);
-        }
+        }*/
 
 
         if (ctx->instr_ctx.store.eip ==
@@ -228,11 +228,11 @@ log_entry:
             }
 #endif // ARGOS_NET_TRACKER
         }
-        else if (ctx->instr_ctx.store.eip != 0)
+        /*else if (ctx->instr_ctx.store.eip != 0)
         {
             argos_logf("Unexpected store, expected eip: 0x%x, got eip:0x%x, current eip: 0x%x.\n",
                     ctx->instr_ctx.eip, ctx->instr_ctx.store.eip, state->eip);
-        }
+        }*/
     }
     else
     {
