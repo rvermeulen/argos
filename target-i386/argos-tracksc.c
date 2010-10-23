@@ -221,13 +221,6 @@ void check_call( CPUX86State * env)
             // addressing modes like PAE are enabled.
             if ( env->eip < 0x80000000 )
             {
-                // We search for the function here, because we want
-                // the symbol for the call
-                argos_tracksc_imported_function * function =
-                    find_imported_function(env, module,
-                            env->eip);
-                // Store the pointer to the called function
-                ctx->instr_ctx.called_function = function;
                 if (argos_tracksc_loaded_whitelist)
                 {
                     // Did the shell-code made the call.
@@ -249,12 +242,12 @@ void check_call( CPUX86State * env)
                             // We search for the function here, because we want
                             // the symbol for the call to a function belonging
                             // to a blacklisted module.
-                            //argos_tracksc_imported_function * function =
-                            //    find_imported_function(env, module,
-                            //            env->eip);
+                            argos_tracksc_imported_function * function =
+                                find_imported_function(env, module,
+                                        env->eip);
                             // Store the pointer to the called function
-                            //ctx->instr_ctx.called_function =
-                            //    function;
+                            ctx->instr_ctx.called_function =
+                                function;
 
                             if ( whitelist_entry )
                             {
@@ -325,7 +318,7 @@ void check_call( CPUX86State * env)
                     else if (ctx->running_code == BEFORE_SHELL_CODE)
                     {
                         argos_logf("Encountered unexpected function call "
-                                "before we detected any shell-code.\n")
+                                "before we detected any shell-code.\n");
                             ctx->instr_ctx.call_type = UNKNOWN_CALL;
                     }
                     else
@@ -1301,5 +1294,15 @@ void argos_tracksc_on_system_call(CPUX86State * env)
             argos_tracksc_stop(env);
             exit(EXIT_FAILURE);
         }
+    }
+}
+
+void argos_tracksc_on_int2e(CPUX86State * env)
+{
+    // Windows NT uses the interrupt 2eh to perform system calls.
+    extern char * argos_wprofile;
+    if (!strcmp(argos_wprofile, "win2k" ))
+    {
+        argos_tracksc_on_system_call(env);
     }
 }

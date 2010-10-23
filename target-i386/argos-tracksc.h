@@ -48,6 +48,7 @@ void argos_tracksc_on_translate_ld_addr(CPUX86State * env, target_ulong vaddr,
 void argos_tracksc_on_translate_st_addr(CPUX86State * env, target_ulong vaddr,
         target_phys_addr_t paddr, target_ulong value, target_ulong size);
 void argos_tracksc_on_system_call(CPUX86State * env);
+void argos_tracksc_on_int2e(CPUX86State * env);
 
 // X should be retrieved by the expression get_phys_addr_code(env, addr) +
 // (unsigned long)phys_ram_base

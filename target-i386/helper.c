@@ -1347,10 +1347,9 @@ void raise_interrupt(int intno, int is_int, int error_code,
         intno = check_exception(intno, &error_code);
     }
 
-    // Windows NT uses the interrupt 2eh to perform system calls.
-    if ( intno == 0x2e  && !strcmp(argos_wprofile, "win2k" ))
+    if ( intno == 0x2e )
     {
-        argos_tracksc_on_system_call(env);
+        argos_tracksc_on_int2e(env);
     }
 
     env->exception_index = intno;
