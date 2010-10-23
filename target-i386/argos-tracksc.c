@@ -149,7 +149,6 @@ void argos_tracksc_before_instr_exec(CPUX86State * env)
             // For some reason some instructions are executed more than ones.
             if ( env->tracksc_ctx.prev_logged_eip != env->eip )
             {
-
                 env->tracksc_ctx.instr_ctx.eip = env->eip;
                 env->tracksc_ctx.instr_ctx.logged = 1;
 
@@ -1154,7 +1153,8 @@ void check_ret(CPUX86State * env)
 
     // Are we returning back from a non-shell-code function.
     if ( argos_tracksc_is_tracking(env) && in_shellcode_context(env)
-            && env->tracksc_ctx.running_code != SHELL_CODE)
+            && ( env->tracksc_ctx.running_code == NON_SHELL_CODE
+                || env->tracksc_ctx.running_code == LOAD_LIBRARY_CODE))
     {
         // Are we returning back to the shell-code.
         if ( env->tracksc_ctx.saved_return_address != 0
