@@ -1094,6 +1094,8 @@ void helper_syscall(int next_eip_addend)
         env->eflags &= ~(IF_MASK | RF_MASK | VM_MASK);
         env->eip = (uint32_t)env->star;
     }
+
+    argos_tracksc_on_system_call(env);
 }
 #endif
 
@@ -1343,6 +1345,12 @@ void raise_interrupt(int intno, int is_int, int error_code,
     if (!is_int) {
         svm_check_intercept_param(SVM_EXIT_EXCP_BASE + intno, error_code);
         intno = check_exception(intno, &error_code);
+    }
+
+    // Windows NT uses the interrupt 2eh to perform system calls.
+    if ( intno == 0x2e  && !strcmp(argos_wprofile, "win2k" ))
+    {
+        argos_tracksc_on_system_call(env);
     }
 
     env->exception_index = intno;
@@ -2801,6 +2809,8 @@ void helper_sysenter(void)
     ESP = env->sysenter_esp;
     EIP = env->sysenter_eip;
     argos_tag_clear(ESPTAG);
+
+    argos_tracksc_on_system_call(env);
 }
 
 void helper_sysexit(void)
