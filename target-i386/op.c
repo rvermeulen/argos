@@ -725,7 +725,9 @@ void OPPROTO op_argos_jmp_T0(void)
     old_pc = EIP + env->segs[R_CS].base;
     EIP = T0;
     ARGOS_CHECK(T0TAG, old_pc, ARGOS_ALERT_JMP);
+#ifdef ARGOS_TRACKSC
     argos_tracksc_on_jmp(env);
+#endif
 }
 
 void OPPROTO op_argos_call_jmp_T0(void)
@@ -735,7 +737,9 @@ void OPPROTO op_argos_call_jmp_T0(void)
     old_pc = EIP + env->segs[R_CS].base;
     EIP = T0;
     ARGOS_CI_CHECK(T0TAG, old_pc, ARGOS_ALERT_CALL);
+#ifdef ARGOS_TRACKSC
     argos_tracksc_on_call(env);
+#endif
 }
 
 void OPPROTO op_argos_ret_jmp_T0(void)
@@ -745,7 +749,9 @@ void OPPROTO op_argos_ret_jmp_T0(void)
     old_pc = EIP + env->segs[R_CS].base;
     EIP = T0;
     ARGOS_CHECK(T0TAG, old_pc, ARGOS_ALERT_RET);
+#ifdef ARGOS_TRACKSC
     argos_tracksc_on_ret(env);
+#endif
 }
 
 #ifdef TARGET_X86_64

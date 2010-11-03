@@ -31,14 +31,18 @@
 
 #include "argos-config.h"
 #include "target-i386/argos-utility.h"
+
+#ifdef ARGOS_TRACKSC
 #include "target-i386/argos-tracksc-whitelist.h"
+#endif
 
 extern int argos_csilog;
 extern int argos_fsc;
+#ifdef ARGOS_TRACKSC
 extern int argos_tracksc;
 extern const char * argos_tracksc_whitelist_path;
-
 extern argos_tracksc_whitelist * argos_tracksc_loaded_whitelist;
+#endif
 // Every run we create an unique id to identify this run.
 // This id is used for the generation of log files.
 extern int argos_instance_id;

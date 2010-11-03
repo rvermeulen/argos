@@ -167,9 +167,12 @@ DATA_TYPE REGPARM(1) glue(glue(__ld, SUFFIX), MMUSUFFIX)(target_ulong addr,
             res = glue(glue(ld, USUFFIX), _raw)((uint8_t *)(long)physaddr);
 #endif
         }
-#if defined(ARGOS_SOFTMMU) && (MEMSUFFIX == _data)
-        argos_tracksc_on_translate_ld_addr(env, addr, physaddr, res,
-                DATA_SIZE);
+#if defined(ARGOS_TRACKSC) && defined(ARGOS_SOFTMMU) && (MEMSUFFIX == _data)
+        if (argos_tracksc_is_tracking(env))
+        {
+            argos_tracksc_on_translate_ld_addr(env, addr, physaddr, res,
+                    DATA_SIZE);
+        }
 #endif
     } else {
         /* the page is not in the TLB : fill it */
@@ -386,9 +389,12 @@ void REGPARM(2) glue(glue(__st, SUFFIX), MMUSUFFIX)(target_ulong addr,
 	    glue(ARGOS_MEMMAP_CLR, SUFFIX)((uint8_t *)(long)physaddr);
 #endif
         }
-#if defined(ARGOS_SOFTMMU) && (MEMSUFFIX == _data)
-        argos_tracksc_on_translate_st_addr(env, addr, physaddr, val,
-                DATA_SIZE);
+#if defined(ARGOS_TRACKSC) && defined(ARGOS_SOFTMMU) && (MEMSUFFIX == _data)
+        if ( argos_tracksc_is_tracking(env) )
+        {
+            argos_tracksc_on_translate_st_addr(env, addr, physaddr, val,
+                    DATA_SIZE);
+        }
 #endif
     } else {
         /* the page is not in the TLB : fill it */

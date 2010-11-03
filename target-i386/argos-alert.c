@@ -38,7 +38,9 @@
 #include "osdep.h"
 #include "argos-csi.h"
 #include "argos-check.h"
+#ifdef ARGOS_TRACKSC
 #include "argos-tracksc.h"
+#endif
 #include "../exec-all.h"
 
 #define ALERT_TEMPLATE "[ARGOS] Attack detected, code <%s> PC <%x> TARGET <%x>\n"
@@ -59,10 +61,14 @@ void argos_alert(CPUX86State *env, target_ulong new_pc, argos_rtag_t *tag,
     if (!argos_tag_isdirty(tag))
         code = ARGOS_ALERT_CI;
 
+#ifdef ARGOS_TRACKSC
     if ( !argos_tracksc_is_tracking(env) )
     {
         argos_logf(ALERT_TEMPLATE, adesc[code], old_pc, new_pc);
     }
+#else
+        argos_logf(ALERT_TEMPLATE, adesc[code], old_pc, new_pc);
+#endif
 
     if (argos_csilog)
     {
@@ -73,6 +79,7 @@ void argos_alert(CPUX86State *env, target_ulong new_pc, argos_rtag_t *tag,
     {
         argos_forensics(env, rid);
     }
+#ifdef ARGOS_TRACKSC
     else if (argos_tracksc)
     {
         // When shell-code tracking is enabled, 
@@ -90,6 +97,7 @@ void argos_alert(CPUX86State *env, target_ulong new_pc, argos_rtag_t *tag,
             argos_tracksc_start(env);
         }
     }
+#endif
 #if 0
     else if (argos_sctrack && last_alert_cr3 == -1) {
         argos_sctrack_init(env, old_pc, new_pc, code);

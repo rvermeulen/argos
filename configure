@@ -103,6 +103,7 @@ lowmem="no"
 dyntags="no"
 net_tracker="no"
 whitelist="no"
+tracksc="no"
 check_gcc="yes"
 softmmu="yes"
 linux_user="no"
@@ -328,6 +329,8 @@ for opt do
   ;;
   --enable-whitelist) whitelist="yes"
   ;;
+  --enable-tracksc) tracksc="yes"
+  ;;
   *) echo "ERROR: unknown option $opt"; show_help="yes"
   ;;
   esac
@@ -434,6 +437,8 @@ echo "  --enable-lowmem          memory tracking model for low memory systems"
 echo "  --enable-dyntags         dynamic tag memory allocation"
 echo "  --enable-net-tracker     enable net tracker (network data are written out"
 echo "                           in argos.netlog)"
+echo "  --enable-tracksc         enable tracking of shell-code ( not active by"
+echo "                           default )"
 echo ""
 echo "NOTE: The object files are built at the place where configure is launched"
 exit 1
@@ -771,15 +776,23 @@ echo "uname -r          $uname_release"
 if  test $net_tracker = "yes"; then
 	lowmem="no"
 fi
+
 echo "Low memory mode   $lowmem"
 echo "Dyn. tag alloc.   $dyntags"
 echo "Net tracker mode  $net_tracker"
+echo "Tracksc mode      $tracksc"
 if test $net_tracker = "yes"; then
 	if test $dyntags = "no"; then
 		echo "*** Warning using net tracker mode without dynamic tag       ***"
 		echo "*** allocation requires large quantities of RAM.             ***"
 	fi
 fi
+
+if test $tracksc = "yes"; then
+    echo "*** Warning track shell-code mode is enabled, but not active by default.   ***"
+    echo "*** See Argos help for info on how to activate shell-code tracking.        ***"
+fi
+
 echo "Whitelist support $whitelist"
 
 if test $sdl_too_old = "yes"; then
@@ -1008,6 +1021,9 @@ if [ "$dyntags" = "yes" ]; then
 fi
 if [ "$net_tracker" = "yes" ]; then
 	echo "#define ARGOS_NET_TRACKER" >> $config_h
+fi
+if [ "$tracksc" = "yes" ]; then
+	echo "#define ARGOS_TRACKSC" >> $config_h
 fi
 if [ "$whitelist" = "yes" ]; then
 	echo "#define ARGOS_WHITELIST" >> $config_h

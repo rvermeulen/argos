@@ -1,3 +1,5 @@
+#include "../config-host.h"
+#ifdef ARGOS_TRACKSC
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -264,3 +266,4 @@ int write_header(argos_tracksc_log * log)
         return 0;
     }
 }
+#endif

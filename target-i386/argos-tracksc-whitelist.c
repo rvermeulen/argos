@@ -1,3 +1,5 @@
+#include "../config-host.h"
+#ifdef ARGOS_TRACKSC
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -587,3 +589,4 @@ void whitelist_deleter(void * whitelist_entry)
     slist_destroy(((argos_tracksc_whitelist_entry*)whitelist_entry)->functions,
             free);
 }
+#endif

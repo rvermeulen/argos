@@ -1095,7 +1095,9 @@ void helper_syscall(int next_eip_addend)
         env->eip = (uint32_t)env->star;
     }
 
+#ifdef ARGOS_TRACKSC
     argos_tracksc_on_system_call(env);
+#endif
 }
 #endif
 
@@ -1347,10 +1349,12 @@ void raise_interrupt(int intno, int is_int, int error_code,
         intno = check_exception(intno, &error_code);
     }
 
+#ifdef ARGOS_TRACSKC
     if ( intno == 0x2e )
     {
         argos_tracksc_on_int2e(env);
     }
+#endif
 
     env->exception_index = intno;
     env->error_code = error_code;
@@ -2809,7 +2813,9 @@ void helper_sysenter(void)
     EIP = env->sysenter_eip;
     argos_tag_clear(ESPTAG);
 
+#ifdef ARGOS_TRACKSC
     argos_tracksc_on_system_call(env);
+#endif
 }
 
 void helper_sysexit(void)

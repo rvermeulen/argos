@@ -1,3 +1,5 @@
+#include "../config-host.h"
+#ifdef ARGOS_TRACKSC
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -15,6 +17,7 @@
 #include "winxp/internals.h"
 #include "argos-tracksc-whitelist.h"
 #include "argos-tracksc-log.h"
+#include "argos-tracksc-context.h"
 #include "argos-tracksc.h"
 
 static argos_tracksc_log * binary_log = NULL;
@@ -1267,6 +1270,11 @@ void argos_tracksc_on_translate_st_addr(CPUX86State * env, target_ulong vaddr,
     ctx->instr_ctx.store.size = size;
 #ifdef ARGOS_NET_TRACKER
     ctx->instr_ctx.netidx = ARGOS_NETIDXPTR(paddr);
+    size_t i;
+    for (i = 0; i < size; i++)
+    {
+        ARGOS_INCREMENT_STAGE(ctx->instr_ctx.netidx[i]);
+    }
 #endif
 }
 
@@ -1309,3 +1317,4 @@ static void unexpected_state_failure(CPUX86State * env, unsigned line)
     argos_tracksc_stop(env);
     exit(EXIT_FAILURE);
 }
+#endif

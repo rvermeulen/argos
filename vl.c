@@ -126,7 +126,10 @@ int inet_aton(const char *cp, struct in_addr *ia);
 #include "argos-whitelist.h"
 #define DEFAULT_WHITELIST_FILE "/etc/argos-whitelist"
 #endif
+
+#ifdef ARGOS_TRACKSC
 #include "target-i386/argos-tracksc-whitelist.h"
+#endif
 
 #ifdef CONFIG_SDL
 #ifdef __APPLE__
@@ -271,9 +274,11 @@ int argos_fsc = 1;
 // Upon instantiation this will be given a random number.
 int argos_instance_id = 0;
 char *argos_wprofile = NULL;
+#ifdef ARGOS_TRACKSC
 int argos_tracksc = 0;
 const char * argos_tracksc_whitelist_path = NULL;
 argos_tracksc_whitelist * argos_tracksc_loaded_whitelist = NULL;
+#endif
 #ifdef ARGOS_NET_TRACKER
 FILE *argos_nt_fl = NULL;
 #endif
@@ -8297,7 +8302,6 @@ static int main_loop(void)
                 ti = profile_getclock();
 #endif
                 ret = cpu_exec(env);
-                //argos_tracksc_check_for_invalid_system_call(env);
 #ifdef CONFIG_PROFILER
                 qemu_time += profile_getclock() - ti;
 #endif
@@ -8337,14 +8341,7 @@ static int main_loop(void)
             }
             if (ret == EXCP_DEBUG) 
             {
-                //if ( argos_tracksc_is_tracking(env) )
-                //{
-                //    argos_tracksc_after_instruction_execution(env);
-                //}
-                //else
-                //{
                     vm_stop(EXCP_DEBUG);
-                //}
             }
             /* If all cpus are halted then wait until the next IRQ */
             /* XXX: use timeout computed from timers */
@@ -8477,8 +8474,10 @@ static void help(int exitcode)
 	   "                 (optional if argos logs are disabled)\n"
            "-no-csilog      do not generate an argos log when an attack is detected\n"
            "-no-fsc         do not inject forensics shellcode after an attack is detected\n"
+#ifdef ARGOS_TRACKSC
            "-tracksc        enable post attack shell-code tracking\n"
            "-tracksc-whitelist provide a whitelist of functions that may be executed by the shell-code\n"
+#endif
 #ifdef ARGOS_WHITELIST
            "-wp profile     set the whitelist OS to profile\n"
 #endif
@@ -8636,8 +8635,10 @@ enum {
     QEMU_OPTION_no_fsc,
     QEMU_OPTION_cs_laddr,
     QEMU_OPTION_cs_lport,
+#ifdef ARGOS_TRACKSC
     QEMU_OPTION_tracksc,
     QEMU_OPTION_tracksc_whitelist,
+#endif
     QEMU_OPTION_argos_id,
 };
 
@@ -8757,8 +8758,10 @@ const QEMUOption qemu_options[] = {
     { "vnc", HAS_ARG, QEMU_OPTION_vnc },
     { "csaddr", HAS_ARG, QEMU_OPTION_cs_laddr },
     { "csport", HAS_ARG, QEMU_OPTION_cs_lport },
+#ifdef ARGOS_TRACKSC
     { "tracksc", 0, QEMU_OPTION_tracksc },
     { "tracksc-whitelist", HAS_ARG, QEMU_OPTION_tracksc_whitelist },
+#endif
     { "argos-id", HAS_ARG, QEMU_OPTION_argos_id },
 
     { NULL },
@@ -9661,23 +9664,28 @@ int main(int argc, char **argv)
 	    case QEMU_OPTION_cs_lport:
 		ctrlsock_lport = atoi(optarg);
 		break;
+#ifdef ARGOS_TRACKSC
 	    case QEMU_OPTION_tracksc:
 		if (!argos_fsc)
 		{
                     if ( argos_os_hint == 2 )
                     {
 			argos_tracksc = 1;
-                        fprintf(stderr, "Shell-code tracking is enabled, make sure that the page file is disabled!!!\n");
+                        fprintf(stderr, "Shell-code tracking is enabled, make "
+                                "sure that the page file is disabled!!!\n");
                     }
                     else
                     {
-                        fprintf(stderr, "Shell-code tracking is currently only available for Windows XP!\n");
+                        fprintf(stderr, "Shell-code tracking is currently "
+                                "only available for Windows XP!\n");
                         exit(1);
                     }
 		}
 		else
 		{
-			fprintf(stderr, "Shell-code tracking is only available when forensic shellcode is disabled (-no-fsc)!\n");
+			fprintf(stderr, "Shell-code tracking is only available"
+			        " when forensic shellcode is disabled "
+			        "(-no-fsc)!\n");
 			exit(1);
 		}
 		break;
@@ -9688,15 +9696,19 @@ int main(int argc, char **argv)
                 }
                 else
                 {
-                    fprintf(stderr, "Shell-code tracking is not enabled before defining the tracksc whitelist, ignoring tracksc-whitelist\n");
+                    fprintf(stderr, "Shell-code tracking is not enabled "
+                            "before defining the tracksc whitelist, ignoring "
+                            "tracksc-whitelist\n");
                 }
                 break;
+#endif
             case QEMU_OPTION_argos_id:
                 {
                     argos_instance_id = strtol(optarg, NULL, 10);
                     if ( errno == ERANGE )
                     {
-                        fprintf(stderr, "Unable to store specified instance id, will generate a random one.\n");
+                        fprintf(stderr, "Unable to store specified instance "
+                                "id, will generate a random one.\n");
                         argos_instance_id = 0;
                     }
                 }
@@ -9896,6 +9908,7 @@ int main(int argc, char **argv)
         argos_logf("Generated %i instance id.\n", argos_instance_id);
     }
 
+#ifdef ARGOS_TRACKSC
     if ( argos_tracksc_whitelist_path )
     {
         argos_tracksc_loaded_whitelist =
@@ -9911,6 +9924,7 @@ int main(int argc, char **argv)
             exit(1);
         }
     }
+#endif
 
 
     if (!(argos_memmap = argos_memmap_createz(phys_ram_size))) {

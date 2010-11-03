@@ -700,18 +700,23 @@ int cpu_exec(CPUState *env1)
                 fp.gp = code_gen_buffer + 2 * (1 << 20);
                 (*(void (*)(void)) &fp)();
 #else
+
+#ifdef ARGOS_TRACKSC
                 if (argos_tracksc_is_tracking(env))
                 {
                     argos_tracksc_before_instr_exec(env);
                 }
+#endif
 
                 // Execute the generated instructions.
                 gen_func();
 
+#ifdef ARGOS_TRACKSC
                 if (argos_tracksc_is_tracking(env))
                 {
                     argos_tracksc_after_instr_exec(env);
                 }
+#endif
 
 #endif
                 env->current_tb = NULL;
@@ -738,12 +743,14 @@ int cpu_exec(CPUState *env1)
         {
             env_to_regs();
 
+#ifdef ARGOS_TRACKSC
             /* Take care of the int 2E or sysenter system call before it is
              * executing the target code. */
             if (argos_tracksc_is_tracking(env))
             {
                 argos_tracksc_after_instr_raised_exception(env);
             }
+#endif
         }
     } /* for(;;) */
 
