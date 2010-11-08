@@ -288,7 +288,8 @@ static inline RES_TYPE glue(glue(ld, USUFFIX), MEMSUFFIX)(target_ulong ptr)
 #endif
 
 #if defined(ARGOS_TRACKSC) && defined(ARGOS_SOFTMMU) && (MEMSUFFIX == _data)
-        if (argos_tracksc_is_tracking(env))
+        //if (argos_tracksc_is_tracking(env))
+        if ( ARGOS_TRACKSC_IS_TRACKING )
         {
             argos_tracksc_on_translate_ld_addr(env, addr, physaddr, res,
                     DATA_SIZE);
@@ -337,7 +338,8 @@ static inline int glue(glue(lds, SUFFIX), MEMSUFFIX)(target_ulong ptr)
 #endif
 
 #if defined(ARGOS_TRACKSC) && defined(ARGOS_SOFTMMU) && (MEMSUFFIX == _data)
-        if (argos_tracksc_is_tracking(env))
+        //if (argos_tracksc_is_tracking(env))
+        if ( ARGOS_TRACKSC_IS_TRACKING )
         {
             argos_tracksc_on_translate_ld_addr(env, addr, physaddr, res,
                     DATA_SIZE);
@@ -384,7 +386,8 @@ static inline void glue(glue(st, SUFFIX), MEMSUFFIX)(target_ulong ptr, RES_TYPE 
 	glue(ARGOS_MEMMAP_CLR, SUFFIX)((uint8_t *)physaddr);
 #endif
 #if defined(ARGOS_TRACKSC) && defined(ARGOS_SOFTMMU) && (MEMSUFFIX == _data)
-        if (argos_tracksc_is_tracking(env))
+        //if (argos_tracksc_is_tracking(env))
+        if ( ARGOS_TRACKSC_IS_TRACKING )
         {
             argos_tracksc_on_translate_st_addr(env, addr, physaddr, v,
                     DATA_SIZE);

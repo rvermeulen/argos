@@ -168,7 +168,8 @@ DATA_TYPE REGPARM(1) glue(glue(__ld, SUFFIX), MMUSUFFIX)(target_ulong addr,
 #endif
         }
 #if defined(ARGOS_TRACKSC) && defined(ARGOS_SOFTMMU) && (MEMSUFFIX == _data)
-        if (argos_tracksc_is_tracking(env))
+        //if (argos_tracksc_is_tracking(env))
+        if (ARGOS_TRACKSC_IS_TRACKING)
         {
             argos_tracksc_on_translate_ld_addr(env, addr, physaddr, res,
                     DATA_SIZE);
@@ -390,7 +391,8 @@ void REGPARM(2) glue(glue(__st, SUFFIX), MMUSUFFIX)(target_ulong addr,
 #endif
         }
 #if defined(ARGOS_TRACKSC) && defined(ARGOS_SOFTMMU) && (MEMSUFFIX == _data)
-        if ( argos_tracksc_is_tracking(env) )
+        //if ( argos_tracksc_is_tracking(env) )
+        if (ARGOS_TRACKSC_IS_TRACKING)
         {
             argos_tracksc_on_translate_st_addr(env, addr, physaddr, val,
                     DATA_SIZE);

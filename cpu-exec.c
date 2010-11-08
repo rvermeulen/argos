@@ -702,7 +702,8 @@ int cpu_exec(CPUState *env1)
 #else
 
 #ifdef ARGOS_TRACKSC
-                if (argos_tracksc_is_tracking(env))
+                //if (argos_tracksc_is_tracking(env))
+                if ( ARGOS_TRACKSC_IS_TRACKING )
                 {
                     argos_tracksc_before_instr_exec(env);
                 }
@@ -712,7 +713,8 @@ int cpu_exec(CPUState *env1)
                 gen_func();
 
 #ifdef ARGOS_TRACKSC
-                if (argos_tracksc_is_tracking(env))
+                //if (argos_tracksc_is_tracking(env))
+                if ( ARGOS_TRACKSC_IS_TRACKING )
                 {
                     argos_tracksc_after_instr_exec(env);
                 }
