@@ -33,25 +33,23 @@ typedef struct
     const char * error;
 } parser_context;
 
-static parser_context * create_parser(const char * input_file);
-static void destroy_parser(parser_context * ctx);
-static char peek(parser_context * ctx);
-static char read(parser_context * ctx);
-static int at_end_of_file(parser_context * ctx);
-static int is_end_of_file(char ch);
-static void skip_whitespace(parser_context * ctx);
-static void skip_comment(parser_context * ctx);
-static int skip_whitespace_until(parser_context * ctx, char stop_ch);
-static void restore_read(parser_context * ctx);
+static inline parser_context * create_parser(const char * input_file);
+static inline void destroy_parser(parser_context * ctx);
+static inline char peek(parser_context * ctx);
+static inline char read(parser_context * ctx);
+static inline int is_end_of_file(char ch);
+static inline void skip_whitespace(parser_context * ctx);
+static inline void skip_comment(parser_context * ctx);
+static inline int skip_whitespace_until(parser_context * ctx, char stop_ch);
 
-char * read_identifier(parser_context * ctx);
-char * read_file_name(parser_context * ctx);
-char * read_module_name(parser_context * ctx);
-char * read_function_name(parser_context * ctx);
+static inline char * read_identifier(parser_context * ctx);
+static inline char * read_file_name(parser_context * ctx);
+static inline char * read_module_name(parser_context * ctx);
+static inline char * read_function_name(parser_context * ctx);
 
-void whitelist_deleter(void * whitelist_entry);
+static void whitelist_deleter(void * whitelist_entry);
 
-parser_context * create_parser(const char * input_file)
+static inline parser_context * create_parser(const char * input_file)
 {
     if ( !input_file)
     {
@@ -83,7 +81,7 @@ parser_context * create_parser(const char * input_file)
 
 }
 
-void destroy_parser(parser_context * ctx)
+static inline void destroy_parser(parser_context * ctx)
 {
     if ( ctx )
     {
@@ -92,7 +90,7 @@ void destroy_parser(parser_context * ctx)
     }
 }
 
-char peek(parser_context * ctx)
+static inline char peek(parser_context * ctx)
 {
     char ch = fgetc(ctx->input);
     ungetc(ch, ctx->input);
@@ -100,7 +98,7 @@ char peek(parser_context * ctx)
     return ch;
 }
 
-char read(parser_context * ctx)
+static inline char read(parser_context * ctx)
 {
     char ch = fgetc(ctx->input);
 
@@ -117,17 +115,12 @@ char read(parser_context * ctx)
     return ch;
 }
 
-int at_end_of_file(parser_context * ctx)
-{
-    return ctx->ch == EOF;
-}
-
-int is_end_of_file(char ch)
+static inline int is_end_of_file(char ch)
 {
     return ch == EOF;
 }
 
-void skip_whitespace(parser_context * ctx)
+static inline void skip_whitespace(parser_context * ctx)
 {
     while( isspace(peek(ctx)) )
     {
@@ -135,7 +128,7 @@ void skip_whitespace(parser_context * ctx)
     }
 }
 
-int skip_whitespace_until(parser_context * ctx, char stop_ch)
+static inline int skip_whitespace_until(parser_context * ctx, char stop_ch)
 {
     char ch = peek(ctx);
     while( ch != EOF )
@@ -159,7 +152,7 @@ int skip_whitespace_until(parser_context * ctx, char stop_ch)
     return 0;
 }
 
-char * read_identifier(parser_context * ctx)
+static inline char * read_identifier(parser_context * ctx)
 {
     char ch = peek(ctx);
 
@@ -197,7 +190,7 @@ char * read_identifier(parser_context * ctx)
 
 // Does not implement to correct parsing of filenames on windows,
 // but is sufficient for now.
-char * read_file_name(parser_context * ctx)
+static inline char * read_file_name(parser_context * ctx)
 {
     char ch = peek(ctx);
 
@@ -231,11 +224,6 @@ char * read_file_name(parser_context * ctx)
     }
 
     return NULL;
-}
-
-void restore_read(parser_context * ctx)
-{
-    ungetc(ctx->ch, ctx->input);
 }
 
 void argos_tracksc_print_whitelist(argos_tracksc_whitelist * whitelist)
@@ -467,7 +455,7 @@ error:
     return NULL;
 }
 
-void skip_comment(parser_context * ctx)
+static inline void skip_comment(parser_context * ctx)
 {
     int character = EOF;
     do
@@ -476,7 +464,7 @@ void skip_comment(parser_context * ctx)
     } while (character != EOF && character != EOL);
 }
 
-char * read_module_name(parser_context * ctx)
+static inline char * read_module_name(parser_context * ctx)
 {
     if ( read(ctx) == '[')
     {
@@ -507,7 +495,7 @@ char * read_module_name(parser_context * ctx)
     return NULL;
 }
 
-char * read_function_name(parser_context * ctx)
+static inline char * read_function_name(parser_context * ctx)
 {
     char * function_name = read_identifier(ctx);
 
@@ -582,7 +570,7 @@ void argos_tracksc_destroy_whitelist(argos_tracksc_whitelist * whitelist)
     slist_destroy(whitelist, whitelist_deleter);
 }
 
-void whitelist_deleter(void * whitelist_entry)
+static void whitelist_deleter(void * whitelist_entry)
 {
     free((void *)
             ((argos_tracksc_whitelist_entry*)whitelist_entry)->module_name);

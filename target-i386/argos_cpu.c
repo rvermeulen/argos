@@ -40,6 +40,8 @@
 #include "argos-tag.h"
 #include "../argos-common.h"
 
+extern void argos_tracksc_init(CPUX86State * env);
+extern void argos_tracksc_stop(CPUX86State * env);
 
 void argos_init(CPUX86State *env)
 {

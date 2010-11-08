@@ -11,7 +11,7 @@
 #include "argos-tracksc-log.h"
 #include "../argos-common.h"
 
-int write_header(argos_tracksc_log * log);
+static inline int write_header(argos_tracksc_log * log);
 
 argos_tracksc_log * argos_tracksc_create_log(const char * path,
         CPUX86State * state)
@@ -244,7 +244,7 @@ log_entry:
     log->current_entry++;
 }
 
-int write_header(argos_tracksc_log * log)
+static inline int write_header(argos_tracksc_log * log)
 {
     argos_tracksc_log_hdr hdr;
     hdr.signature = ARGOS_TRACKSC_LOG_SIGNATURE;

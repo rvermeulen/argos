@@ -1096,7 +1096,10 @@ void helper_syscall(int next_eip_addend)
     }
 
 #ifdef ARGOS_TRACKSC
-    argos_tracksc_on_system_call(env);
+    if (argos_tracksc_is_tracking(env))
+    {
+        argos_tracksc_on_system_call(env);
+    }
 #endif
 }
 #endif
@@ -1350,7 +1353,7 @@ void raise_interrupt(int intno, int is_int, int error_code,
     }
 
 #ifdef ARGOS_TRACSKC
-    if ( intno == 0x2e )
+    if ( intno == 0x2e && argos_tracksc_is_tracking(env))
     {
         argos_tracksc_on_int2e(env);
     }
@@ -2814,7 +2817,10 @@ void helper_sysenter(void)
     argos_tag_clear(ESPTAG);
 
 #ifdef ARGOS_TRACKSC
-    argos_tracksc_on_system_call(env);
+    if (argos_tracksc_is_tracking(env))
+    {
+        argos_tracksc_on_system_call(env);
+    }
 #endif
 }
 

@@ -22,30 +22,30 @@
 
 static argos_tracksc_log * binary_log = NULL;
 
-static void instr_at_pc(CPUX86State * env);
-static void instr_at_addr(CPUX86State * env,
+static inline void instr_at_pc(CPUX86State * env);
+static inline void instr_at_addr(CPUX86State * env,
         target_phys_addr_t address);
 static void address_translation_failure(CPUX86State * env,
-        target_ulong address);
-static void memory_allocation_failure(CPUX86State * env, unsigned line);
-static void unexpected_state_failure(CPUX86State * env, unsigned line);
+        target_ulong address) __attribute__ ((noreturn));
+static void memory_allocation_failure(CPUX86State * env, unsigned line) __attribute__ ((noreturn));
+static void unexpected_state_failure(CPUX86State * env, unsigned line) __attribute__ ((noreturn));
 static void get_imported_modules(CPUX86State * env);
-static target_ulong get_current_thread_id(CPUX86State * env);
-static unsigned char in_shellcode_context(CPUX86State * env);
+static inline target_ulong get_current_thread_id(CPUX86State * env);
+static inline unsigned char in_shellcode_context(CPUX86State * env);
 static void save_shellcode_context(CPUX86State * env);
 static void start_analysis_phase(CPUX86State * env);
 static void start_tracking_phase(CPUX86State * env);
-static argos_tracksc_imported_module * find_module(CPUX86State * env,
+static inline argos_tracksc_imported_module * find_module(CPUX86State * env,
         target_ulong address);
-static argos_tracksc_imported_function * find_imported_function(
+static inline argos_tracksc_imported_function * find_imported_function(
         CPUX86State * env, argos_tracksc_imported_module * module,
         target_ulong address);
-static unsigned char is_loadlibrary_function(const char * function_name);
-static void save_return_address(CPUX86State * env);
+static inline unsigned char is_loadlibrary_function(const char * function_name);
+static inline void save_return_address(CPUX86State * env);
 static void imported_module_deleter(void * imported_module);
 static void export_deleter(void * export);
-static void check_ret(CPUX86State * env);
-static void check_call( CPUX86State * env);
+static inline void check_ret(CPUX86State * env);
+static inline void check_call( CPUX86State * env);
 extern void vm_stop(int reason);
 
 
@@ -208,7 +208,7 @@ void argos_tracksc_after_instr_raised_exception(CPUX86State * env)
 {
 }
 
-void check_call( CPUX86State * env)
+static inline void check_call( CPUX86State * env)
 {
     argos_tracksc_ctx * ctx = &env->tracksc_ctx;
     sigset_t alrmset;
@@ -217,7 +217,7 @@ void check_call( CPUX86State * env)
         perror("could not temporarily block signals");
 
     // We are only interested in calls made by the shell-code.
-    if ( argos_tracksc_is_tracking(env) && in_shellcode_context(env) )
+    if ( in_shellcode_context(env) )
     {
         if ( ctx->running_code == SHELL_CODE )
         {
@@ -341,7 +341,7 @@ void check_call( CPUX86State * env)
         perror("could not unblock temporarily blocked signals");
 }
 
-static target_ulong get_current_thread_id(CPUX86State * env)
+static inline target_ulong get_current_thread_id(CPUX86State * env)
 {
     target_ulong teb_address = env->segs[R_FS].base;
     target_phys_addr_t translated_teb_address = translate_address(env,
@@ -356,7 +356,7 @@ static target_ulong get_current_thread_id(CPUX86State * env)
                 CLIENT_ID_UNIQUE_THREAD));
 }
 
-static unsigned char in_shellcode_context(CPUX86State * env)
+static inline unsigned char in_shellcode_context(CPUX86State * env)
 {
     if ( env->cr[3] == env->tracksc_ctx.cr3 )
     {
@@ -385,7 +385,7 @@ static void memory_allocation_failure(CPUX86State * env, unsigned line)
 }
 
 
-static void instr_at_pc(CPUX86State * env)
+static inline void instr_at_pc(CPUX86State * env)
 {
     target_ulong program_counter = 0;
     target_phys_addr_t translated_program_counter = 0;
@@ -404,7 +404,7 @@ static void instr_at_pc(CPUX86State * env)
     }
 }
 
-static void instr_at_addr(CPUX86State * env, target_phys_addr_t address)
+static inline void instr_at_addr(CPUX86State * env, target_phys_addr_t address)
 {
     // libdasm should be replaced with a faster function to calculate the
     // length of the instruction, because this is all we need.
@@ -446,7 +446,7 @@ static void instr_at_addr(CPUX86State * env, target_phys_addr_t address)
 
 }
 
-static argos_tracksc_imported_module * get_module(CPUX86State * env,
+static inline argos_tracksc_imported_module * get_module(CPUX86State * env,
         target_ulong base_address)
 {
     target_ulong dos_header = base_address;
@@ -689,7 +689,7 @@ static argos_tracksc_imported_module * get_module(CPUX86State * env,
 // characters, but the destination size is the size of the buffer INCLUDING
 // the zero terminating character. The source and destination pointers MUST
 // BE valid pointers.
-static uint32_t utf16_to_utf8(uint16_t * source, uint32_t source_length,
+static inline uint32_t utf16_to_utf8(uint16_t * source, uint32_t source_length,
         char * destination, uint32_t destination_size)
 {
    uint32_t i = 0, number_converted_characters = 0;
@@ -938,7 +938,7 @@ static void start_tracking_phase(CPUX86State * env)
 
 // Find the module for which the given address is in its range.
 // Returns NULL when no module could be found.
-static argos_tracksc_imported_module * find_module(CPUX86State * env,
+static inline argos_tracksc_imported_module * find_module(CPUX86State * env,
         target_ulong address)
 {
     slist_entry * cursor = env->tracksc_ctx.imported_modules;
@@ -961,7 +961,7 @@ static argos_tracksc_imported_module * find_module(CPUX86State * env,
     return NULL;
 }
 
-static argos_tracksc_imported_function * find_imported_function(
+static inline argos_tracksc_imported_function * find_imported_function(
         CPUX86State * env,
         argos_tracksc_imported_module * module,
         target_ulong address)
@@ -1094,7 +1094,7 @@ static argos_tracksc_imported_function * find_imported_function(
     return NULL;
 }
 
-static unsigned char is_loadlibrary_function(const char * function_name)
+static inline unsigned char is_loadlibrary_function(const char * function_name)
 {
     if ( strcmp(function_name, "LoadLibraryA") == 0 )
     {
@@ -1121,7 +1121,7 @@ static unsigned char is_loadlibrary_function(const char * function_name)
 
 // This function assumes that the top of the stack points to the
 // return address.
-static void save_return_address(CPUX86State * env)
+static inline void save_return_address(CPUX86State * env)
 {
     target_ulong * return_address = (target_ulong *)translate_address(env,
             env->regs[R_ESP]);
@@ -1137,7 +1137,7 @@ static void save_return_address(CPUX86State * env)
 
 // Here we save the content of the eax register when the eip equals the
 // value of the saved return address.
-void check_ret(CPUX86State * env)
+static inline void check_ret(CPUX86State * env)
 {
     sigset_t alrmset;
 
@@ -1145,7 +1145,7 @@ void check_ret(CPUX86State * env)
         perror("could not temporarily block signals");
 
     // Are we returning back from a non-shell-code function.
-    if ( argos_tracksc_is_tracking(env) && in_shellcode_context(env) )
+    if ( in_shellcode_context(env) )
     {
         if ( env->tracksc_ctx.running_code == NON_SHELL_CODE
                 || env->tracksc_ctx.running_code == LOAD_LIBRARY_CODE)
@@ -1234,53 +1234,64 @@ void argos_tracksc_on_call(CPUX86State * env)
 {
     check_call(env);
 }
+
 void argos_tracksc_on_jmp(CPUX86State * env)
 {
     check_call(env);
     check_ret(env);
 }
+
 void argos_tracksc_on_ret(CPUX86State * env)
 {
     check_ret(env);
 }
 
-void argos_tracksc_on_translate_ld_addr(CPUX86State * env, target_ulong vaddr,
+void argos_tracksc_on_translate_ld_addr(CPUX86State * env,
+        target_ulong vaddr,
         target_phys_addr_t paddr, target_ulong value, target_ulong size)
 {
-    argos_tracksc_ctx * ctx = &env->tracksc_ctx;
-    ctx->instr_ctx.load.eip = env->eip;
-    ctx->instr_ctx.load.vaddr = vaddr;
-    ctx->instr_ctx.load.paddr = (target_ulong)(paddr -
-            (target_phys_addr_t)phys_ram_base);
-    ctx->instr_ctx.load.value = value;
-    ctx->instr_ctx.load.size = size;
-#ifdef ARGOS_NET_TRACKER
-    ctx->instr_ctx.netidx = ARGOS_NETIDXPTR(paddr);
-#endif
-}
-void argos_tracksc_on_translate_st_addr(CPUX86State * env, target_ulong vaddr,
-        target_phys_addr_t paddr, target_ulong value, target_ulong size)
-{
-    argos_tracksc_ctx * ctx = &env->tracksc_ctx;
-    ctx->instr_ctx.store.eip = env->eip;
-    ctx->instr_ctx.store.vaddr = vaddr;
-    ctx->instr_ctx.store.paddr = (target_ulong)(paddr -
-            (target_phys_addr_t)phys_ram_base);
-    ctx->instr_ctx.store.value = value;
-    ctx->instr_ctx.store.size = size;
-#ifdef ARGOS_NET_TRACKER
-    ctx->instr_ctx.netidx = ARGOS_NETIDXPTR(paddr);
-    size_t i;
-    for (i = 0; i < size; i++)
+    if ( in_shellcode_context(env) )
     {
-        ARGOS_INCREMENT_STAGE(ctx->instr_ctx.netidx[i]);
-    }
+        argos_tracksc_ctx * ctx = &env->tracksc_ctx;
+        ctx->instr_ctx.load.eip = env->eip;
+        ctx->instr_ctx.load.vaddr = vaddr;
+        ctx->instr_ctx.load.paddr = (target_ulong)(paddr -
+                (target_phys_addr_t)phys_ram_base);
+        ctx->instr_ctx.load.value = value;
+        ctx->instr_ctx.load.size = size;
+#ifdef ARGOS_NET_TRACKER
+        ctx->instr_ctx.netidx = ARGOS_NETIDXPTR(paddr);
 #endif
+    }
+}
+
+void argos_tracksc_on_translate_st_addr(CPUX86State * env,
+        target_ulong vaddr,
+        target_phys_addr_t paddr, target_ulong value, target_ulong size)
+{
+    if ( in_shellcode_context(env) )
+    {
+        argos_tracksc_ctx * ctx = &env->tracksc_ctx;
+        ctx->instr_ctx.store.eip = env->eip;
+        ctx->instr_ctx.store.vaddr = vaddr;
+        ctx->instr_ctx.store.paddr = (target_ulong)(paddr -
+                (target_phys_addr_t)phys_ram_base);
+        ctx->instr_ctx.store.value = value;
+        ctx->instr_ctx.store.size = size;
+#ifdef ARGOS_NET_TRACKER
+        ctx->instr_ctx.netidx = ARGOS_NETIDXPTR(paddr);
+        size_t i;
+        for (i = 0; i < size; i++)
+        {
+            ARGOS_INCREMENT_STAGE(ctx->instr_ctx.netidx[i]);
+        }
+#endif
+    }
 }
 
 void argos_tracksc_on_system_call(CPUX86State * env)
 {
-    if ( argos_tracksc_is_tracking(env) && in_shellcode_context(env) )
+    if ( in_shellcode_context(env) )
     {
         argos_tracksc_ctx * ctx = &env->tracksc_ctx;
         // Shell-code is not allowed to directly call syscalls.

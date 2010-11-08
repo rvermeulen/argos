@@ -738,7 +738,10 @@ void OPPROTO op_argos_call_jmp_T0(void)
     EIP = T0;
     ARGOS_CI_CHECK(T0TAG, old_pc, ARGOS_ALERT_CALL);
 #ifdef ARGOS_TRACKSC
-    argos_tracksc_on_call(env);
+    if (argos_tracksc_is_tracking(env))
+    {
+        argos_tracksc_on_call(env);
+    }
 #endif
 }
 
@@ -750,7 +753,10 @@ void OPPROTO op_argos_ret_jmp_T0(void)
     EIP = T0;
     ARGOS_CHECK(T0TAG, old_pc, ARGOS_ALERT_RET);
 #ifdef ARGOS_TRACKSC
-    argos_tracksc_on_ret(env);
+    if (argos_tracksc_is_tracking(env))
+    {
+        argos_tracksc_on_ret(env);
+    }
 #endif
 }
 
