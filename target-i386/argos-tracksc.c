@@ -166,17 +166,17 @@ void argos_tracksc_before_instr_exec(CPUX86State * env)
                     instr_at_pc(env);
                     argos_tracksc_log_before_execution(binary_log);
                 }
-                else
+                /*else
                 {
                     argos_logf("Skipping previous logged instruction at "
                             "0x%x.\n", env->eip);
-                }
+                }*/
             }
-            else
+            /*else
             {
                 argos_logf("Skipping kernel instruction at "
                         "0x%x.\n", env->eip);
-            }
+            }*/
         }
         /*else
         {
