@@ -79,6 +79,12 @@ void argos_tracksc_flush_log(argos_tracksc_log * log)
         log->current_entry = &log->buffered_entries[0];
 
         memset(log->buffered_entries, 0, sizeof(log->buffered_entries));
+
+        //argos_logf("Flushed %i entries to log.\n", cnt);
+    }
+    else
+    {
+        argos_logf("Flush requested, but nothing to flush.\n");
     }
 }
 
@@ -100,6 +106,8 @@ log_entry:
         memcpy(entry->cpu_state.regs, state->regs, sizeof(state->regs));
         entry->cpu_state.eip = state->eip;
         entry->cpu_state.eflags = state->eflags;
+
+        //argos_logf("Logged cpu state.\n");
     }
     else
     {
@@ -151,7 +159,7 @@ log_entry:
 
 #ifdef ARGOS_NET_TRACKER
             size_t i;
-            // Print the netidx's belonging to the value loaded.
+            // Log the netidx's belonging to the value loaded.
             for (i = 0; i < ctx->load_size; i++)
             {
                 argos_netidx_t* netidx;
@@ -181,12 +189,6 @@ log_entry:
             }
 #endif // ARGOS_NET_TRACKER
         }
-        /*else if (ctx->instr_ctx.load.eip != 0)
-        {
-            argos_logf("Unexpected load, expected eip: 0x%x, got eip:0x%x, current eip: 0x%x.\n",
-                    ctx->instr_ctx.eip, ctx->instr_ctx.load.eip, state->eip);
-        }*/
-
 
         if (ctx->instr_ctx.store.eip ==
                 ctx->instr_ctx.eip)
@@ -230,11 +232,8 @@ log_entry:
             }
 #endif // ARGOS_NET_TRACKER
         }
-        /*else if (ctx->instr_ctx.store.eip != 0)
-        {
-            argos_logf("Unexpected store, expected eip: 0x%x, got eip:0x%x, current eip: 0x%x.\n",
-                    ctx->instr_ctx.eip, ctx->instr_ctx.store.eip, state->eip);
-        }*/
+
+        //argos_logf("Logged instruction, symbols and memory references.\n");
     }
     else
     {
