@@ -27,8 +27,10 @@ static inline void instr_at_addr(CPUX86State * env,
         target_phys_addr_t address);
 static void address_translation_failure(CPUX86State * env,
         target_ulong address) __attribute__ ((noreturn));
-static void memory_allocation_failure(CPUX86State * env, unsigned line) __attribute__ ((noreturn));
-static void unexpected_state_failure(CPUX86State * env, unsigned line) __attribute__ ((noreturn));
+static void memory_allocation_failure(CPUX86State * env,
+        unsigned line) __attribute__ ((noreturn));
+static void unexpected_state_failure(CPUX86State * env,
+        unsigned line) __attribute__ ((noreturn));
 static void get_imported_modules(CPUX86State * env);
 static inline target_ulong get_current_thread_id(CPUX86State * env);
 static inline unsigned char in_shellcode_context(CPUX86State * env);
@@ -145,6 +147,7 @@ void argos_tracksc_before_instr_exec(CPUX86State * env)
         if ( env->tracksc_ctx.running_code == BEFORE_SHELL_CODE
                 && argos_dest_pc_isdirty(env, env->eip))
         {
+            //argos_logf("BEFORE-SHELL-CODE --> SHELL-CODE\n");
             env->tracksc_ctx.running_code = SHELL_CODE;
         }
 
@@ -153,7 +156,8 @@ void argos_tracksc_before_instr_exec(CPUX86State * env)
             // Filter kernel-code ran in the shell-code context.
             if ( env->eip < 0x80000000 )
             {
-                // For some reason some instructions are executed more than ones.
+                // For some reason some instructions are executed more than
+                // ones, probably restarted because of interrupts.
                 if ( env->tracksc_ctx.prev_logged_eip != env->eip )
                 {
                     env->tracksc_ctx.instr_ctx.eip = env->eip;
@@ -162,14 +166,27 @@ void argos_tracksc_before_instr_exec(CPUX86State * env)
                     instr_at_pc(env);
                     argos_tracksc_log_before_execution(binary_log);
                 }
-                /*else
+                else
                 {
-                    argos_logf("Skipping already logged instruction at 0x%x\n",
-                            env->eip);
-                }*/
+                    argos_logf("Skipping previous logged instruction at "
+                            "0x%x.\n", env->eip);
+                }
+            }
+            else
+            {
+                argos_logf("Skipping kernel instruction at "
+                        "0x%x.\n", env->eip);
             }
         }
+        /*else
+        {
+            argos_logf("Executing non-shellcode instruction.\n");
+        }*/
     }
+    /*else
+    {
+        argos_logf("Executing instruction outside of context.\n");
+    }*/
 }
 
 void argos_tracksc_after_instr_exec(CPUX86State * env)
@@ -261,6 +278,7 @@ static inline void check_call( CPUX86State * env)
                                         if (is_loadlibrary_function(
                                                     function->name))
                                         {
+                                            //argos_logf("SHELL-CODE --> LOAD-LIBRARY-CODE\n");
                                             ctx->running_code =
                                                 LOAD_LIBRARY_CODE;
                                         }
@@ -269,6 +287,7 @@ static inline void check_call( CPUX86State * env)
                                             argos_logf("Shell-code "
                                                     "called %s\n",
                                                     function->name);
+                                            //argos_logf("SHELL-CODE --> NON-SHELL-CODE\n");
                                             ctx->running_code =
                                                 NON_SHELL_CODE;
                                         }
@@ -335,6 +354,14 @@ static inline void check_call( CPUX86State * env)
                 ctx->instr_ctx.call_type = UNKNOWN_CALL;
             }
         }
+        /*else if ( ctx->running_code == NON_SHELL_CODE )
+        {
+            // If the target is shell-code.
+            if (argos_dest_pc_isdirty(env, env->eip))
+            {
+                ctx->running_code = SHELL_CODE;
+            }
+        }*/
     }
 
     if (sigprocmask(SIG_UNBLOCK, &alrmset, NULL) != 0)
@@ -1147,6 +1174,8 @@ static inline void check_ret(CPUX86State * env)
     // Are we returning back from a non-shell-code function.
     if ( in_shellcode_context(env) )
     {
+        // We are only interested in transfers from non-shell-code to
+        // shell-code.
         if ( env->tracksc_ctx.running_code == NON_SHELL_CODE
                 || env->tracksc_ctx.running_code == LOAD_LIBRARY_CODE)
         {
@@ -1204,13 +1233,21 @@ static inline void check_ret(CPUX86State * env)
                 }
 
                 // We back at running shell-code.
+                //argos_logf("NON-SHELL-CODE --> SHELL-CODE\n");
                 env->tracksc_ctx.running_code = SHELL_CODE;
             }
+            else
+            {
+                // Check if return to shell-code!
+                if (argos_dest_pc_isdirty(env, env->eip))
+                {
+                    argos_logf("Unexpected return to shell-code from "
+                            "non-shell-code\n");
+                    //argos_logf("NON-SHELL-CODE --> SHELL-CODE\n");
+                    env->tracksc_ctx.running_code = SHELL_CODE;
+                }
+            }
         }
-        /*else if (env->tracksc_ctx.running_code == SHELL_CODE)
-        {
-            argos_logf("Shellcode returns to 0x%x\n", env->eip);
-        }*/
     }
 
     if (sigprocmask(SIG_UNBLOCK, &alrmset, NULL) != 0)
@@ -1237,13 +1274,18 @@ void argos_tracksc_on_call(CPUX86State * env)
 
 void argos_tracksc_on_jmp(CPUX86State * env)
 {
-    check_call(env);
+    // Jumps can be used as returns.
     check_ret(env);
+    check_call(env);
 }
 
 void argos_tracksc_on_ret(CPUX86State * env)
 {
     check_ret(env);
+    // Returns can be used to call functions:
+    //  push address
+    //  ret
+    check_call(env);
 }
 
 void argos_tracksc_on_translate_ld_addr(CPUX86State * env,
