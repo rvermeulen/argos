@@ -748,7 +748,8 @@ int cpu_exec(CPUState *env1)
 #ifdef ARGOS_TRACKSC
             /* Take care of the int 2E or sysenter system call before it is
              * executing the target code. */
-            if (argos_tracksc_is_tracking(env))
+            //if (argos_tracksc_is_tracking(env))
+            if ( ARGOS_TRACKSC_IS_TRACKING )
             {
                 argos_tracksc_after_instr_raised_exception(env);
             }
