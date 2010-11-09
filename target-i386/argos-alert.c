@@ -63,7 +63,7 @@ void argos_alert(CPUX86State *env, target_ulong new_pc, argos_rtag_t *tag,
 
 #ifdef ARGOS_TRACKSC
     //if ( !argos_tracksc_is_tracking(env) )
-    if ( ARGOS_TRACKSC_IS_TRACKING )
+    if ( !ARGOS_TRACKSC_IS_TRACKING )
     {
         argos_logf(ALERT_TEMPLATE, adesc[code], old_pc, new_pc);
     }
