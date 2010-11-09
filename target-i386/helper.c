@@ -1353,7 +1353,7 @@ void raise_interrupt(int intno, int is_int, int error_code,
         intno = check_exception(intno, &error_code);
     }
 
-#ifdef ARGOS_TRACSKC
+#ifdef ARGOS_TRACKSC
     //if ( intno == 0x2e && argos_tracksc_is_tracking(env))
     if ( intno == 0x2e && ARGOS_TRACKSC_IS_TRACKING)
     {

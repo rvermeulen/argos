@@ -6895,7 +6895,7 @@ static inline int gen_intermediate_code_internal(CPUState *env,
         if (dc->is_jmp)
             break;
 
-#ifdef ARGOS_TRACSKC
+#ifdef ARGOS_TRACKSC
         /* If we are tracking shell-code, we generate only on instruction. */
         if ( env->tracksc_ctx.single_step )
         {
