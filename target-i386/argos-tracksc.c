@@ -20,6 +20,15 @@
 #include "argos-tracksc-context.h"
 #include "argos-tracksc.h"
 
+#define ARGOS_TRACKSC_TIME
+#ifdef ARGOS_TRACKSC_TIME
+#include <sys/time.h>
+struct timeval start_tracking;
+struct timeval stop_tracking;
+#endif
+
+
+// TODO: Move this to the context.
 static argos_tracksc_log * binary_log = NULL;
 
 static inline void instr_at_pc(CPUX86State * env);
@@ -48,6 +57,7 @@ static void imported_module_deleter(void * imported_module);
 static void export_deleter(void * export);
 static inline void check_ret(CPUX86State * env);
 static inline void check_call( CPUX86State * env);
+static int dump_process(CPUX86State *env);
 extern void vm_stop(int reason);
 
 
@@ -101,6 +111,18 @@ void argos_tracksc_stop(CPUX86State * env)
     {
         argos_tracksc_close_log(binary_log);
     }
+
+#ifdef ARGOS_TRACKSC_TIME
+    if (!gettimeofday(&stop_tracking, NULL))
+    {
+        argos_logf("Tracking the payload took %lu sec.\n",
+                stop_tracking.tv_sec - start_tracking.tv_sec);
+    }
+    else
+    {
+        perror("Failed to retrieve time of day!\nTiming is inaccurate.");
+    }
+#endif
 }
 
 unsigned char argos_tracksc_is_idle( CPUX86State * env)
@@ -115,6 +137,12 @@ unsigned char argos_tracksc_is_tracking( CPUX86State * env)
 
 void argos_tracksc_start(CPUX86State * env)
 {
+#ifdef ARGOS_TRACKSC_TIME
+    if (gettimeofday(&start_tracking, NULL) == -1)
+    {
+        perror("Failed to retrieve time of day!\nTiming is inaccurate.");
+    }
+#endif
     argos_logf("Starting shell-code tracking...\n");
 
     const unsigned filename_size = 128;
@@ -202,6 +230,11 @@ void argos_tracksc_after_instr_exec(CPUX86State * env)
         if (env->tracksc_ctx.instr_ctx.call_type == BLACKLISTED_CALL ||
                 env->tracksc_ctx.instr_ctx.call_type == UNKNOWN_CALL)
         {
+            argos_logf("Dumping pages attacked process...\n");
+            if ( dump_process(env) != 0 )
+            {
+                argos_logf("Failed to dump pages of attacked process!\n");
+            }
             argos_tracksc_stop(env);
             exit(EXIT_SUCCESS);
         }
@@ -1370,4 +1403,96 @@ static void unexpected_state_failure(CPUX86State * env, unsigned line)
     argos_tracksc_stop(env);
     exit(EXIT_FAILURE);
 }
+
+// Quick hack of code from argos-csi.c to dump all the pages of the process.
+static uint64_t as_start_kernel[][2] = { 
+	{ 0xc0000000U, 0xffff810000000000ULL }, // Linux kernel
+	{ 0x80000000U, 0x0000000080000000ULL },  // Windows 2k kernel
+	{ 0x80000000U, 0x0000000080000000ULL },  // Windows XP kernel
+};
+
+static uint64_t as_stop_kernel[][2] = { 
+	{ 0xffffffffU, 0xffffffffffffffffULL }, // Linux kernel
+	{ 0xffffffffU, 0x00000000ffffffffULL },  // Windows 2k kernel
+	{ 0xffffffffU, 0x00000000ffffffffULL },  // Windows XP kernel
+};
+
+#ifdef TARGET_X86_64
+#define FIRST_KERNEL_ADDR(os) (as_start_kernel[(os)][1])
+#define LAST_KERNEL_ADDR(os) (as_stop_kernel[(os)][1] - TARGET_PAGE_SIZE + 1)
+#define FIRST_USER_ADDR(os) (0x00000000)
+#define LAST_USER_ADDR(os) (as_start_kernel[(os)][1] - TARGET_PAGE_SIZE + 1)
+#else
+#define FIRST_KERNEL_ADDR(os) (as_start_kernel[(os)][0])
+#define LAST_KERNEL_ADDR(os) (as_stop_kernel[(os)][0] - TARGET_PAGE_SIZE + 1)
+#define FIRST_USER_ADDR(os) (0x00000000)
+#define LAST_USER_ADDR(os) (as_start_kernel[(os)][0] - TARGET_PAGE_SIZE + 1)
+#endif
+
+typedef struct _argos_page_hdr
+{
+    target_ulong vaddr;
+    target_phys_addr_t paddr;
+    size_t size;
+} argos_page_hdr __attribute__((packed));
+
+static int page_write(FILE *fp, CPUX86State *env,
+        target_ulong vaddr, target_ulong paddr)
+{
+    argos_page_hdr hdr;
+
+    hdr.vaddr = vaddr;
+    hdr.paddr = paddr;
+    hdr.size = TARGET_PAGE_SIZE;
+
+    if (fwrite(&hdr, sizeof(argos_page_hdr), 1, fp) != 1)
+        goto error;
+    if (fwrite(phys_ram_base + hdr.paddr, 1, hdr.size, fp) != hdr.size)
+        goto error;
+    return 0;
+error:
+    perror("Could not write memory block - fwrite()");
+    return -1;
+}
+
+static int
+dump_process(CPUX86State *env)
+{
+    target_ulong page_i, page_max, paddr;
+    PhysPageDesc *pdesc;
+    FILE * fp;
+    char fn[128];
+
+    snprintf(fn, 128, "argos.scp.%i", argos_instance_id);
+
+    if ((fp = fopen(fn, "wb")) == NULL) {
+        perror("Could not create argos log - fopen()");
+        return -1;
+    }
+    // Code privilege level 0 (kernel)
+    if ((env->hflags & HF_CPL_MASK) == 0) {
+        page_i = FIRST_KERNEL_ADDR(argos_os_hint);
+        page_max = LAST_KERNEL_ADDR(argos_os_hint);
+    } else { // User
+        page_i = FIRST_USER_ADDR(argos_os_hint);
+        page_max = LAST_USER_ADDR(argos_os_hint);
+    }
+
+    do {
+        paddr = cpu_get_phys_page_debug(env, page_i);
+        if (paddr == -1)
+            goto next;
+        if (!(pdesc = phys_page_find(paddr >> TARGET_PAGE_BITS)))
+            goto next;
+        if (page_write(fp, env, page_i,
+                    pdesc->phys_offset & TARGET_PAGE_MASK) != 0)
+            return -1;
+next:
+        page_i += (target_ulong)TARGET_PAGE_SIZE;
+    } while (page_i <= page_max && page_i > 0);
+
+    fclose(fp);
+    return 0;
+}
+
 #endif
