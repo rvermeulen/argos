@@ -1429,25 +1429,41 @@ static uint64_t as_stop_kernel[][2] = {
 #define LAST_USER_ADDR(os) (as_start_kernel[(os)][0] - TARGET_PAGE_SIZE + 1)
 #endif
 
-typedef struct _argos_page_hdr
+struct _argos_page_dump_hdr
+{
+    // Should equal to 'ARGOS'
+    uint8_t signature[5];
+    // LSB = minor version, MSB = major version
+    uint16_t version;
+    // 0 = little endian, 1 = big endian.
+    uint8_t endianness;
+    // 0 = 32bit host and 32bit guest.
+    // 1 = 32bit host and 64bit guest.
+    // 2 = 64bit host and 32bit guest.
+    // 3 = 64bit host and 64bit guest.
+    uint8_t arch;
+    uint32_t page_size;
+
+} __attribute__((packed));
+typedef struct _argos_page_dump_hdr argos_page_dump_hdr;
+
+struct _argos_page_hdr
 {
     target_ulong vaddr;
     target_phys_addr_t paddr;
-    size_t size;
-} argos_page_hdr __attribute__((packed));
+} __attribute__((packed));
+typedef struct _argos_page_hdr argos_page_hdr;
 
 static int page_write(FILE *fp, CPUX86State *env,
         target_ulong vaddr, target_ulong paddr)
 {
     argos_page_hdr hdr;
-
     hdr.vaddr = vaddr;
     hdr.paddr = paddr;
-    hdr.size = TARGET_PAGE_SIZE;
 
     if (fwrite(&hdr, sizeof(argos_page_hdr), 1, fp) != 1)
         goto error;
-    if (fwrite(phys_ram_base + hdr.paddr, 1, hdr.size, fp) != hdr.size)
+    if (fwrite(phys_ram_base + hdr.paddr, 1, TARGET_PAGE_SIZE, fp) != TARGET_PAGE_SIZE)
         goto error;
     return 0;
 error:
@@ -1463,10 +1479,23 @@ dump_process(CPUX86State *env)
     FILE * fp;
     char fn[128];
 
-    snprintf(fn, 128, "argos.scp.%i", argos_instance_id);
+    snprintf(fn, 128, "argos.pages.%i", argos_instance_id);
 
     if ((fp = fopen(fn, "wb")) == NULL) {
         perror("Could not create argos log - fopen()");
+        return -1;
+    }
+
+    argos_page_dump_hdr hdr;
+    memcpy(hdr.signature, "ARGOS", sizeof(hdr.signature));
+    hdr.version = (1 << 8);
+    hdr.endianness = 0;
+    hdr.arch = 3;
+    hdr.page_size = TARGET_PAGE_SIZE;
+
+    if (fwrite(&hdr, sizeof(argos_page_dump_hdr), 1, fp) != 1)
+    {
+        perror("Could not write page dump header - fwrite()");
         return -1;
     }
     // Code privilege level 0 (kernel)
