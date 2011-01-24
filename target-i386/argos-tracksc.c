@@ -230,11 +230,13 @@ void argos_tracksc_after_instr_exec(CPUX86State * env)
         if (env->tracksc_ctx.instr_ctx.call_type == BLACKLISTED_CALL ||
                 env->tracksc_ctx.instr_ctx.call_type == UNKNOWN_CALL)
         {
+#if 0
             argos_logf("Dumping pages attacked process...\n");
             if ( dump_process(env) != 0 )
             {
                 argos_logf("Failed to dump pages of attacked process!\n");
             }
+#endif
             argos_tracksc_stop(env);
             exit(EXIT_SUCCESS);
         }
