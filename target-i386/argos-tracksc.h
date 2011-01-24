@@ -60,7 +60,6 @@ void argos_tracksc_on_int2e(CPUX86State * env);
     #define ARGOS_NETIDXPTR(X) (0)
 #endif
 
-#endif
-
 #define ARGOS_TRACKSC_IS_TRACKING (env->tracksc_ctx.instance_state == TRACKING)
 
+#endif
