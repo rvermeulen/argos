@@ -105,13 +105,13 @@ static inline RES_TYPE glue(glue(ld, USUFFIX), MEMSUFFIX)(target_ulong ptr)
 {
     int res;
 
-    asm volatile ("movl %1, %%edx\n"
-                  "movl %1, %%eax\n"
-                  "shrl %3, %%edx\n"
-                  "andl %4, %%eax\n"
-                  "andl %2, %%edx\n"
-                  "leal %5(%%edx, %%ebp), %%edx\n"
-                  "cmpl (%%edx), %%eax\n"
+    asm volatile ("movl %1, %%edx\n"    // edx = ptr
+                  "movl %1, %%eax\n"    // eax = ptr
+                  "shrl %3, %%edx\n"    // calculate tlb index by dividing ptr by the number of tlb entries.
+                  "andl %4, %%eax\n"    // get the page
+                  "andl %2, %%edx\n"    // make sure that the index is within the bounds of tlb table.
+                  "leal %5(%%edx, %%ebp), %%edx\n" // load the tlb entry with the calculated index.
+                  "cmpl (%%edx), %%eax\n" // is the tlb entry equal to the requested page?
                   "movl %1, %%eax\n"
                   "je 1f\n"
                   "pushl %6\n"
@@ -131,14 +131,14 @@ static inline RES_TYPE glue(glue(ld, USUFFIX), MEMSUFFIX)(target_ulong ptr)
 #error unsupported size
 #endif
                   "2:\n"
-                  : "=r" (res)
-                  : "r" (ptr),
-                  "i" ((CPU_TLB_SIZE - 1) << CPU_TLB_ENTRY_BITS),
-                  "i" (TARGET_PAGE_BITS - CPU_TLB_ENTRY_BITS),
-                  "i" (TARGET_PAGE_MASK | (DATA_SIZE - 1)),
-                  "m" (*(uint32_t *)offsetof(CPUState, tlb_table[CPU_MMU_INDEX][0].addr_read)),
-                  "i" (CPU_MMU_INDEX),
-                  "m" (*(uint8_t *)&glue(glue(__ld, SUFFIX), MMUSUFFIX))
+                  : "=r" (res)  // %0
+                  : "r" (ptr),  // %1
+                  "i" ((CPU_TLB_SIZE - 1) << CPU_TLB_ENTRY_BITS),   // %2
+                  "i" (TARGET_PAGE_BITS - CPU_TLB_ENTRY_BITS),      // %3
+                  "i" (TARGET_PAGE_MASK | (DATA_SIZE - 1)),         // %4
+                  "m" (*(uint32_t *)offsetof(CPUState, tlb_table[CPU_MMU_INDEX][0].addr_read)), // %5
+                  "i" (CPU_MMU_INDEX),  // %6
+                  "m" (*(uint8_t *)&glue(glue(__ld, SUFFIX), MMUSUFFIX)) // %7
                   : "%eax", "%ecx", "%edx", "memory", "cc");
     return res;
 }
@@ -311,7 +311,7 @@ static inline int glue(glue(lds, SUFFIX), MEMSUFFIX)(target_ulong ptr)
     target_ulong addr;
     unsigned long physaddr;
     int mmu_idx;
-    
+
     addr = ptr;
     index = (addr >> TARGET_PAGE_BITS) & (CPU_TLB_SIZE - 1);
     mmu_idx = CPU_MMU_INDEX;
