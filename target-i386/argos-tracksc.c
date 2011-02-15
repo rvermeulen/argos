@@ -480,30 +480,21 @@ static inline void instr_at_addr(CPUX86State * env, target_phys_addr_t address)
     unsigned i = 0;
     unsigned max_stage = 0;
 
-    memset(env->tracksc_ctx.instr_ctx.netidx, 0,
-            ARGOS_MAX_INSTRUCTION_SIZE);
-
-    for ( i = 0; i < env->tracksc_ctx.instr_ctx.decoding.length; ++i )
+    argos_netidx_t * netidx = env->tracksc_ctx.instr_ctx.netidx = ARGOS_NETIDXPTR(address);
+    if ( netidx != NULL )
     {
-        argos_netidx_t* netidx = ARGOS_NETIDXPTR(address + i);
-        if (netidx != 0)
+        for ( i = 0; i < env->tracksc_ctx.instr_ctx.decoding.length; ++i )
         {
             // Currently the stage of the instruction equals 
             // to the highest stage of an individual 
             // instruction byte.
-            if ( ARGOS_GET_STAGE(*netidx) > max_stage )
+            if ( ARGOS_GET_STAGE(netidx[i]) > max_stage )
             {
-                max_stage = ARGOS_GET_STAGE(*netidx);
+                max_stage = ARGOS_GET_STAGE(netidx[i]);
             }
-            env->tracksc_ctx.instr_ctx.netidx[i] =
-                *netidx;
-        }
-        else
-        {
-            env->tracksc_ctx.instr_ctx.netidx[i] = 0;
         }
     }
-    env->tracksc_ctx.instruction_stage = max_stage;
+    env->tracksc_ctx.instr_ctx.stage = max_stage;
 #endif // ARGOS_NET_TRACKER
 
 }
@@ -1337,7 +1328,7 @@ void argos_tracksc_on_translate_ld_addr(CPUX86State * env,
         ctx->instr_ctx.load.value = value;
         ctx->instr_ctx.load.size = size;
 #ifdef ARGOS_NET_TRACKER
-        ctx->instr_ctx.netidx = ARGOS_NETIDXPTR(paddr);
+        ctx->instr_ctx.load.netidx = ARGOS_NETIDXPTR(paddr);
 #endif
     }
 }
@@ -1356,11 +1347,14 @@ void argos_tracksc_on_translate_st_addr(CPUX86State * env,
         ctx->instr_ctx.store.value = value;
         ctx->instr_ctx.store.size = size;
 #ifdef ARGOS_NET_TRACKER
-        ctx->instr_ctx.netidx = ARGOS_NETIDXPTR(paddr);
-        size_t i;
-        for (i = 0; i < size; i++)
+        ctx->instr_ctx.store.netidx = ARGOS_NETIDXPTR(paddr);
+        if (ctx->instr_ctx.store.netidx != NULL )
         {
-            ARGOS_INCREMENT_STAGE(ctx->instr_ctx.netidx[i]);
+            size_t i;
+            for (i = 0; i < size; i++)
+            {
+                ARGOS_INCREMENT_STAGE(ctx->instr_ctx.store.netidx[i]);
+            }
         }
 #endif
     }
@@ -1405,6 +1399,8 @@ static void unexpected_state_failure(CPUX86State * env, unsigned line)
     argos_tracksc_stop(env);
     exit(EXIT_FAILURE);
 }
+
+#if 0
 
 // Quick hack of code from argos-csi.c to dump all the pages of the process.
 static uint64_t as_start_kernel[][2] = { 
@@ -1525,5 +1521,6 @@ next:
     fclose(fp);
     return 0;
 }
+#endif
 
 #endif

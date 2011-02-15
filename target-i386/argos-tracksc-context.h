@@ -111,7 +111,7 @@ typedef struct _argos_tracksc_instr_ctx
     // The stage of the instruction being executed.
     unsigned char stage;
     // corresponding raw net id.
-    argos_netidx_t netidx[ARGOS_MAX_INSTRUCTION_SIZE];
+    argos_netidx_t * netidx;
 #endif
 } argos_tracksc_instr_ctx;
 // The argos shellcode context contains the context that is needed to

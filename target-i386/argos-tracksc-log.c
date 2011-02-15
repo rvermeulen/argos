@@ -136,8 +136,14 @@ log_entry:
                 ctx->instr_ctx.decoding.length);
         entry->instruction.size = ctx->instr_ctx.decoding.length;
 #ifdef ARGOS_NET_TRACKER
-        memcpy(entry->instruction.netidx, ctx->instr_ctx.netidx,
-                ctx->instr_ctx.decoding.length);
+        if (ctx->instr_ctx.netidx)
+        {
+            size_t i;
+            for (i = 0; i < ctx->instr_ctx.decoding.length; i++) 
+            {
+                entry->instruction.netidx[i] = ARGOS_GET_NETIDX(ctx->instr_ctx.netidx[i]);
+            }
+        }
         entry->instruction.stage = ctx->instr_ctx.stage;
 #endif
         if (ctx->instr_ctx.called_function)
@@ -158,33 +164,13 @@ log_entry:
             entry->memory_read.size = ctx->instr_ctx.load.size;
 
 #ifdef ARGOS_NET_TRACKER
-            size_t i;
-            // Log the netidx's belonging to the value loaded.
-            for (i = 0; i < ctx->load_size; i++)
+            if (ctx->instr_ctx.load.netidx != NULL)
             {
-                argos_netidx_t* netidx;
-                if (ctx->load_addr_type ==
-                        HOST_VIRTUAL)
+                size_t i;
+                // Log the netidx's belonging to the value loaded.
+                for (i = 0; i < ctx->instr_ctx.load.size; i++)
                 {
-                    netidx = ARGOS_NETIDXPTR(
-                            ctx->load_addr + i);
-                }
-                else
-                {
-                    if (ctx->load_value_netidx != 0)
-                    {
-                        netidx =
-                            ctx->load_value_netidx + i;
-                    }
-                    else
-                    {
-                        netidx = 0;
-                    }
-                }
-
-                if (netidx != 0)
-                {
-                    entry->memory_read.netidxs[i] = ARGOS_GET_NETIDX(*netidx);
+                    entry->memory_read.netidx[i] = ARGOS_GET_NETIDX(ctx->instr_ctx.load.netidx[i]);
                 }
             }
 #endif // ARGOS_NET_TRACKER
@@ -200,34 +186,13 @@ log_entry:
             entry->memory_written.size = ctx->instr_ctx.store.size;
 
 #ifdef ARGOS_NET_TRACKER
-            size_t i;
-            // Print the netidx's belonging to the value stored.
-            for (i = 0; i < ctx->store_size; i++)
+            if (ctx->instr_ctx.store.netidx != NULL)
             {
-                argos_netidx_t* netidx;
-                if (ctx->store_addr_type ==
-                        HOST_VIRTUAL)
+                size_t i;
+                // Log the netidx's belonging to the value loaded.
+                for (i = 0; i < ctx->instr_ctx.store.size; i++)
                 {
-                    netidx = ARGOS_NETIDXPTR(
-                            ctx->store_addr + i);
-                }
-                else
-                {
-                    if (ctx->store_value_netidx != 0)
-                    {
-                        netidx =
-                            ctx->store_value_netidx + i;
-                    }
-                    else
-                    {
-                        netidx = 0;
-                    }
-                }
-
-                if (netidx != 0)
-                {
-                    entry->memory_written.netidxs[i] =
-                        ARGOS_GET_NETIDX(*netidx);
+                    entry->memory_written.netidx[i] = ARGOS_GET_NETIDX(ctx->instr_ctx.store.netidx[i]);
                 }
             }
 #endif // ARGOS_NET_TRACKER

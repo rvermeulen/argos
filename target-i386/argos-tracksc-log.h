@@ -31,7 +31,7 @@ typedef struct
     target_ulong value;
     target_ulong size;
 #ifdef ARGOS_NET_TRACKER
-    argos_netidx_t netidxs[sizeof(target_ulong)];
+    argos_netidx_t netidx[sizeof(target_ulong)];
 #endif
 } __attribute__((packed)) argos_tracksc_log_memory_entry;
 
@@ -47,9 +47,9 @@ typedef struct
     char bytes[15];
     uint8_t size;
 #ifdef ARGOS_NET_TRACKER
-    argos_netidx_t netidxs[15];
-#endif
+    argos_netidx_t netidx[15];
     uint8_t stage;
+#endif
     // If an instruction is a call or jmp to a function of which we
     // know the name, we want to store that as well.
     char operand1_symbol[64];
