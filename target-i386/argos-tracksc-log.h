@@ -46,13 +46,13 @@ typedef struct
 {
     char bytes[15];
     uint8_t size;
+    // If an instruction is a call or jmp to a function of which we
+    // know the name, we want to store that as well.
+    char operand1_symbol[64];
 #ifdef ARGOS_NET_TRACKER
     argos_netidx_t netidx[15];
     uint8_t stage;
 #endif
-    // If an instruction is a call or jmp to a function of which we
-    // know the name, we want to store that as well.
-    char operand1_symbol[64];
 } __attribute__((packed)) argos_tracksc_log_instruction_entry;
 
 
