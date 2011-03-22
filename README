@@ -1,0 +1,23 @@
+Argos is advertised honeypot using dynamic taint analysis to detect and
+analysis control flow attacks.
+For more info on Argos you can visit http://www.few.vu.nl/argos
+
+In this extension I have implemented payload analysis functionality that
+detects the execution of a payload and captures runtime information for 
+further analysis as part of my master thesis.
+The runtime information captured includes the execution trace, the memory
+references, the cpu state, and optionally the stage of the instructions.
+
+A stage references the number of unpacking that has occurred.
+Every byte of the captured execution trace initially starts with stage zero and
+everytime the payload writes a byte to memory that bytes has a stage equal to
+the stage of the read byte plus one.
+
+The stage can be used to detect the various parts of the payload.
+Instructions with stage zero belong to the NOP-sled and first unpacker,
+instructions with a stage greater than zero but smaller than the maximum stage
+in the execution trace belong to various unpackers, and the instructions with
+the greatest stage belong to the shell-code.
+
+For more information on the implementation see my thesis and slides in the doc
+directory.
